@@ -1,0 +1,15 @@
+{
+  "setting": {
+    "newFeature": true,
+    "urlCheck": true,
+    "es6": false,
+    "postcss": false,
+    "minified": false,
+    "checkSiteMap": false,
+    "autoAudits": false
+  },
+  "appid": "wx148dae01230d7062",
+  "projectname": "ai-chat-mini",
+  "description": "A mpx project",
+  "condition": {}
+}
