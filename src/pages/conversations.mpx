@@ -1,0 +1,266 @@
+<template>
+  <view class="container">
+    <view class="header">
+      <text class="title">对话历史</text>
+    </view>
+
+    <view class="conversation-list">
+      <view wx:if="{{loading}}" class="loading">
+        <text>加载中...</text>
+      </view>
+
+      <view wx:elif="{{error}}" class="error">
+        <text>{{error}}</text>
+        <button bindtap="loadConversations">重试</button>
+      </view>
+
+      <view wx:elif="{{conversations.length === 0}}" class="empty">
+        <text>暂无对话记录</text>
+        <button bindtap="goToHome">去首页选择角色</button>
+      </view>
+
+      <view wx:else>
+        <view
+          wx:for="{{conversations}}"
+          wx:key="id"
+          class="conversation-item"
+          bindtap="handleConversationTap"
+          data-conversation="{{item}}"
+        >
+          <image
+            class="avatar"
+            src="{{item.character.avatarUrl || '/static/images/default-avatar.png'}}"
+            mode="aspectFill"
+          />
+          <view class="info">
+            <view class="top">
+              <text class="name">{{item.character.name}}</text>
+              <text class="time">{{formatTime(item.lastMessageAt)}}</text>
+            </view>
+            <text class="count">{{item.messageCount}} 条消息</text>
+          </view>
+          <view class="actions">
+            <button
+              class="delete-btn"
+              catchtap="handleDelete"
+              data-id="{{item.id}}"
+            >
+              删除
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script lang="ts">
+import { createPage } from '@mpxjs/core'
+import { conversationApi } from '../common/api'
+import type { Conversation } from '../common/types'
+
+createPage({
+  data: {
+    conversations: [] as Conversation[],
+    loading: true,
+    error: ''
+  },
+
+  onLoad() {
+    this.loadConversations()
+  },
+
+  onShow() {
+    // 每次显示页面时重新加载
+    if (!this.loading) {
+      this.loadConversations()
+    }
+  },
+
+  methods: {
+    async loadConversations() {
+      this.loading = true
+      this.error = ''
+
+      try {
+        const conversations = await conversationApi.getConversations()
+        this.conversations = conversations
+      } catch (err: any) {
+        this.error = err.message || '加载失败'
+        console.error('加载对话列表失败:', err)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    handleConversationTap(e: any) {
+      const conversation = e.currentTarget.dataset.conversation
+      // 跳转到聊天页面，加载历史消息
+      wx.navigateTo({
+        url: `/pages/chat?conversationId=${conversation.id}`
+      })
+    },
+
+    async handleDelete(e: any) {
+      const id = e.currentTarget.dataset.id
+
+      const res = await wx.showModal({
+        title: '确认删除',
+        content: '删除后无法恢复，确定要删除这个对话吗？'
+      })
+
+      if (!res.confirm) return
+
+      try {
+        wx.showLoading({ title: '删除中...' })
+        await conversationApi.deleteConversation(id)
+        wx.hideLoading()
+        wx.showToast({ title: '删除成功', icon: 'success' })
+
+        // 重新加载列表
+        this.loadConversations()
+      } catch (err: any) {
+        wx.hideLoading()
+        console.error('删除对话失败:', err)
+        wx.showToast({ title: err.message || '删除失败', icon: 'none' })
+      }
+    },
+
+    goToHome() {
+      wx.switchTab({ url: '/pages/index' })
+    },
+
+    formatTime(time: string | null): string {
+      if (!time) return ''
+
+      const date = new Date(time)
+      const now = new Date()
+      const diff = now.getTime() - date.getTime()
+
+      // 一分钟内
+      if (diff < 60000) {
+        return '刚刚'
+      }
+
+      // 一小时内
+      if (diff < 3600000) {
+        return `${Math.floor(diff / 60000)}分钟前`
+      }
+
+      // 今天
+      if (date.toDateString() === now.toDateString()) {
+        const hours = date.getHours().toString().padStart(2, '0')
+        const minutes = date.getMinutes().toString().padStart(2, '0')
+        return `${hours}:${minutes}`
+      }
+
+      // 昨天
+      const yesterday = new Date(now)
+      yesterday.setDate(yesterday.getDate() - 1)
+      if (date.toDateString() === yesterday.toDateString()) {
+        return '昨天'
+      }
+
+      // 更早
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const day = date.getDate().toString().padStart(2, '0')
+      return `${month}-${day}`
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+.container
+  min-height 100vh
+  background #f5f5f5
+
+  .header
+    padding 48rpx 32rpx 32rpx
+    background #fff
+    border-bottom 1rpx solid #e5e5e5
+
+    .title
+      font-size 48rpx
+      font-weight 700
+      color #333
+
+  .conversation-list
+    .loading, .error, .empty
+      text-align center
+      padding 100rpx 0
+      color #999
+      font-size 28rpx
+
+      button
+        margin-top 40rpx
+        background #667eea
+        color #fff
+        border none
+
+    .conversation-item
+      display flex
+      align-items center
+      padding 32rpx
+      background #fff
+      border-bottom 1rpx solid #f5f5f5
+
+      &:active
+        background #f9f9f9
+
+      .avatar
+        width 96rpx
+        height 96rpx
+        border-radius 48rpx
+        margin-right 24rpx
+        background #f5f5f5
+        flex-shrink 0
+
+      .info
+        flex 1
+        display flex
+        flex-direction column
+        min-width 0
+
+        .top
+          display flex
+          justify-content space-between
+          align-items center
+          margin-bottom 12rpx
+
+          .name
+            font-size 32rpx
+            font-weight 600
+            color #333
+            overflow hidden
+            text-overflow ellipsis
+            white-space nowrap
+
+          .time
+            font-size 24rpx
+            color #999
+            margin-left 16rpx
+            flex-shrink 0
+
+        .count
+          font-size 26rpx
+          color #999
+
+      .actions
+        margin-left 16rpx
+
+        .delete-btn
+          padding 8rpx 24rpx
+          background #ff4d4f
+          color #fff
+          border none
+          font-size 24rpx
+          border-radius 8rpx
+</style>
+
+<script type="application/json">
+  {
+    "navigationBarTitleText": "对话历史",
+    "enablePullDownRefresh": true
+  }
+</script>

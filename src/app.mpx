@@ -13,8 +13,35 @@ createApp({})
 <script type="application/json">
   {
     "pages": [
-      "./pages/index"
-    ]
+      "./pages/index",
+      "./pages/chat",
+      "./pages/conversations"
+    ],
+    "tabBar": {
+      "color": "#999",
+      "selectedColor": "#667eea",
+      "backgroundColor": "#fff",
+      "list": [
+        {
+          "pagePath": "pages/index",
+          "text": "角色",
+          "iconPath": "../static/images/tab-home.png",
+          "selectedIconPath": "../static/images/tab-home-active.png"
+        },
+        {
+          "pagePath": "pages/conversations",
+          "text": "对话",
+          "iconPath": "../static/images/tab-chat.png",
+          "selectedIconPath": "../static/images/tab-chat-active.png"
+        }
+      ]
+    },
+    "window": {
+      "backgroundTextStyle": "light",
+      "navigationBarBackgroundColor": "#fff",
+      "navigationBarTitleText": "AI 陪伴",
+      "navigationBarTextStyle": "black"
+    }
   }
 </script>
 

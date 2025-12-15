@@ -1,0 +1,243 @@
+<template>
+  <view class="chat-container">
+    <!-- 消息列表 -->
+    <scroll-view
+      scroll-y
+      class="message-list"
+      scroll-into-view="{{scrollToView}}"
+      scroll-with-animation
+    >
+      <view wx:if="{{loading}}" class="loading">
+        <text>加载中...</text>
+      </view>
+
+      <view wx:else>
+        <message-bubble
+          wx:for="{{messages}}"
+          wx:key="id"
+          id="msg-{{item.id}}"
+          message="{{item}}"
+          avatarUrl="{{character.avatarUrl}}"
+        />
+      </view>
+
+      <!-- 滚动锚点 -->
+      <view id="scroll-bottom" class="scroll-anchor"></view>
+    </scroll-view>
+
+    <!-- 输入框 -->
+    <view class="input-bar">
+      <input
+        class="input"
+        type="text"
+        placeholder="输入消息..."
+        value="{{inputText}}"
+        bindinput="handleInput"
+        bindconfirm="handleSend"
+        confirm-type="send"
+        disabled="{{sending}}"
+      />
+      <button
+        class="send-btn {{inputText ? 'active' : ''}}"
+        bindtap="handleSend"
+        disabled="{{sending || !inputText}}"
+      >
+        {{sending ? '发送中' : '发送'}}
+      </button>
+    </view>
+  </view>
+</template>
+
+<script lang="ts">
+import { createPage } from '@mpxjs/core'
+import { characterApi, conversationApi } from '../common/api'
+import type { Character, Message } from '../common/types'
+
+createPage({
+  data: {
+    characterId: 0,
+    conversationId: 0,
+    character: null as Character | null,
+    messages: [] as Message[],
+    inputText: '',
+    loading: true,
+    sending: false,
+    scrollToView: ''
+  },
+
+  onLoad(options: any) {
+    // 支持两种方式进入：1. 从角色列表（传 characterId）2. 从对话历史（传 conversationId）
+    if (options.conversationId) {
+      this.conversationId = parseInt(options.conversationId)
+      this.loadExistingConversation()
+    } else if (options.characterId) {
+      this.characterId = parseInt(options.characterId)
+      this.init()
+    } else {
+      wx.showToast({ title: '参数错误', icon: 'none' })
+      wx.navigateBack()
+    }
+  },
+
+  methods: {
+    // 新建对话
+    async init() {
+      try {
+        // 加载角色信息
+        this.character = await characterApi.getCharacterDetail(this.characterId)
+
+        // 创建对话
+        const conversation = await conversationApi.createConversation(this.characterId)
+        this.conversationId = conversation.id
+
+        // 如果有欢迎语，添加到消息列表
+        if (this.character.greetingMessage) {
+          this.messages = [{
+            id: 0,
+            conversationId: this.conversationId,
+            role: 'assistant',
+            content: this.character.greetingMessage,
+            tokens: null,
+            createdAt: new Date().toISOString()
+          }]
+        }
+
+        this.loading = false
+        this.scrollToBottom()
+      } catch (err: any) {
+        console.error('初始化失败:', err)
+        wx.showToast({ title: err.message || '初始化失败', icon: 'none' })
+      }
+    },
+
+    // 加载已有对话
+    async loadExistingConversation() {
+      try {
+        // 加载消息历史
+        const messages = await conversationApi.getConversationMessages(this.conversationId)
+        this.messages = messages
+
+        // 从消息中获取角色信息（如果有的话）
+        if (messages.length > 0) {
+          // 这里需要从对话 API 获取角色 ID，暂时从第一条消息推断
+          // TODO: 后端可以在 getConversationMessages 返回中包含对话信息
+        }
+
+        this.loading = false
+        this.scrollToBottom()
+      } catch (err: any) {
+        console.error('加载对话失败:', err)
+        wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+      }
+    },
+
+    handleInput(e: any) {
+      this.inputText = e.detail.value
+    },
+
+    async handleSend() {
+      const content = this.inputText.trim()
+      if (!content || this.sending) return
+
+      // 添加用户消息到列表
+      const userMessage: Message = {
+        id: Date.now(),
+        conversationId: this.conversationId,
+        role: 'user',
+        content,
+        tokens: null,
+        createdAt: new Date().toISOString()
+      }
+      this.messages = [...this.messages, userMessage]
+      this.inputText = ''
+      this.scrollToBottom()
+
+      // 发送消息
+      this.sending = true
+      try {
+        const response = await conversationApi.sendMessage(this.conversationId, content)
+
+        // 添加 AI 回复
+        this.messages = [...this.messages, response]
+        this.scrollToBottom()
+      } catch (err: any) {
+        console.error('发送消息失败:', err)
+        wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+      } finally {
+        this.sending = false
+      }
+    },
+
+    scrollToBottom() {
+      this.$nextTick(() => {
+        this.scrollToView = 'scroll-bottom'
+      })
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+.chat-container
+  height 100vh
+  display flex
+  flex-direction column
+  background #f5f5f5
+
+  .message-list
+    flex 1
+    padding 32rpx 0
+    overflow-y auto
+
+    .loading
+      text-align center
+      padding 100rpx 0
+      color #999
+      font-size 28rpx
+
+    .scroll-anchor
+      height 1rpx
+
+  .input-bar
+    display flex
+    align-items center
+    padding 24rpx 32rpx
+    background #fff
+    border-top 1rpx solid #e5e5e5
+    padding-bottom calc(24rpx + env(safe-area-inset-bottom))
+
+    .input
+      flex 1
+      height 72rpx
+      padding 0 24rpx
+      background #f5f5f5
+      border-radius 36rpx
+      font-size 28rpx
+
+    .send-btn
+      margin-left 16rpx
+      padding 0 32rpx
+      height 72rpx
+      line-height 72rpx
+      background #ddd
+      color #999
+      border-radius 36rpx
+      font-size 28rpx
+      border none
+
+      &.active
+        background #667eea
+        color #fff
+
+      &[disabled]
+        opacity 0.6
+</style>
+
+<script type="application/json">
+  {
+    "navigationBarTitleText": "聊天",
+    "usingComponents": {
+      "message-bubble": "../components/message-bubble"
+    }
+  }
+</script>

@@ -1,21 +1,120 @@
 <template>
-  <list></list>
+  <view class="container">
+    <view class="header">
+      <text class="title">选择角色</text>
+      <text class="subtitle">开始你的专属陪伴之旅</text>
+    </view>
+
+    <view class="character-list">
+      <view wx:if="{{loading}}" class="loading">
+        <text>加载中...</text>
+      </view>
+
+      <view wx:elif="{{error}}" class="error">
+        <text>{{error}}</text>
+        <button bindtap="loadCharacters">重试</button>
+      </view>
+
+      <view wx:else>
+        <character-card
+          wx:for="{{characters}}"
+          wx:key="id"
+          character="{{item}}"
+          bindtap="handleCharacterTap"
+        />
+      </view>
+    </view>
+  </view>
 </template>
 
 <script lang="ts">
 import { createPage } from '@mpxjs/core'
+import { characterApi } from '../common/api'
+import type { Character } from '../common/types'
 
 createPage({
+  data: {
+    characters: [] as Character[],
+    loading: true,
+    error: ''
+  },
+
   onLoad() {
-    //
+    this.loadCharacters()
+  },
+
+  methods: {
+    async loadCharacters() {
+      this.loading = true
+      this.error = ''
+
+      try {
+        const characters = await characterApi.getOfficialCharacters()
+        this.characters = characters
+      } catch (err: any) {
+        this.error = err.message || '加载失败'
+        console.error('加载角色列表失败:', err)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    handleCharacterTap(e: any) {
+      const character = e.detail.character
+      console.log('选择角色:', character)
+
+      // 跳转到聊天页面
+      wx.navigateTo({
+        url: `/pages/chat?characterId=${character.id}`
+      })
+    }
   }
 })
 </script>
 
+<style lang="stylus">
+.container
+  min-height 100vh
+  background linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+  padding 32rpx
+
+  .header
+    padding 48rpx 0
+    text-align center
+
+    .title
+      display block
+      font-size 56rpx
+      font-weight 700
+      color #fff
+      margin-bottom 16rpx
+
+    .subtitle
+      display block
+      font-size 28rpx
+      color rgba(255, 255, 255, 0.8)
+
+  .character-list
+    .loading, .error
+      text-align center
+      padding 100rpx 0
+      color #fff
+      font-size 28rpx
+
+      button
+        margin-top 40rpx
+        background rgba(255, 255, 255, 0.2)
+        color #fff
+        border none
+</style>
+
 <script type="application/json">
   {
+    "navigationBarTitleText": "AI 陪伴",
+    "navigationBarBackgroundColor": "#667eea",
+    "navigationBarTextStyle": "white",
     "usingComponents": {
-      "list": "../components/list"
+      "character-card": "../components/character-card"
     }
   }
 </script>
