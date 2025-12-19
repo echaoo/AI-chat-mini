@@ -3,12 +3,25 @@
     <view class="content-wrapper">
       <view class="text-card">
         <view class="card-corner-tab">祁煜</view>
-        <text class="card-text">你好，我是你的AI朋友，随时准备好倾听你的心声。</text>
+        <text class="card-text">怎么不说话？是没看到我吗？</text>
       </view>
       <view class="button-group">
         <button class="btn secondary-button">哄睡</button>
         <button class="btn main-button" bindtap="navigateToChat">聊天</button>
-        <button class="btn secondary-button">陪你一起</button>
+        <button class="btn secondary-button">陪我一起</button>
+      </view>
+    </view>
+
+    <!-- New Side Navigation -->
+    <view class="side-nav">
+      <view class="side-nav-item" bindtap="navigateToCharacters">
+        <text class="side-nav-text">角色</text>
+      </view>
+      <view class="side-nav-item" bindtap="navigateToConversations">
+        <text class="side-nav-text">消息</text>
+      </view>
+      <view class="side-nav-item" bindtap="navigateToConversations">
+        <text class="side-nav-text">广场</text>
       </view>
     </view>
   </view>
@@ -26,6 +39,16 @@ createPage({
     navigateToChat() {
       wx.navigateTo({
         url: '/pages/chat'
+      })
+    },
+    navigateToCharacters() {
+      wx.navigateTo({
+        url: '/pages/characters'
+      })
+    },
+    navigateToConversations() {
+      wx.navigateTo({
+        url: '/pages/conversations'
       })
     }
   }
@@ -45,7 +68,7 @@ createPage({
   align-items center
   position relative
   box-sizing border-box
-  padding-bottom 80rpx
+  padding-bottom 80rpx // Reverted padding
 
   &::before
     content ''
@@ -137,6 +160,37 @@ createPage({
   width 140rpx
   height 140rpx
   font-size 30rpx
+
+// Styles for new side navigation
+.side-nav
+  position absolute
+  top 200rpx // Moved down again
+  right 30rpx
+  display flex
+  flex-direction column
+  z-index 10
+  align-items flex-end
+
+.side-nav-item
+  border-radius 100rpx // Pill shape
+  background rgba(255, 255, 255, 0.2)
+  border 1px solid rgba(255, 255, 255, 0.3)
+  display flex
+  flex-direction row
+  justify-content center
+  align-items center
+  margin-bottom 20rpx
+  transition background 0.2s
+  padding 12rpx 32rpx
+  
+  &:active
+    background rgba(255, 255, 255, 0.3)
+
+.side-nav-text
+  display block
+  color #fff
+  font-size 30rpx
+  font-weight 500
 
 </style>
 

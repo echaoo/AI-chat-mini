@@ -19,31 +19,7 @@ createApp({})
       "./pages/conversations",
       "./pages/create-character"
     ],
-    "tabBar": {
-      "color": "#999",
-      "selectedColor": "#667eea",
-      "backgroundColor": "#fff",
-      "list": [
-        {
-          "pagePath": "pages/index",
-          "text": "首页",
-          "iconPath": "../static/images/tab-home.png",
-          "selectedIconPath": "../static/images/tab-home-active.png"
-        },
-        {
-          "pagePath": "pages/characters",
-          "text": "角色",
-          "iconPath": "../static/images/tab-chat.png",
-          "selectedIconPath": "../static/images/tab-chat-active.png"
-        },
-        {
-          "pagePath": "pages/conversations",
-          "text": "对话",
-          "iconPath": "../static/images/tab-chat.png",
-          "selectedIconPath": "../static/images/tab-chat-active.png"
-        }
-      ]
-    },
+
     "window": {
       "backgroundTextStyle": "light",
       "navigationBarBackgroundColor": "#fff",
