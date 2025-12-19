@@ -14,6 +14,7 @@ createApp({})
   {
     "pages": [
       "./pages/index",
+      "./pages/characters",
       "./pages/chat",
       "./pages/conversations",
       "./pages/create-character"
@@ -25,9 +26,15 @@ createApp({})
       "list": [
         {
           "pagePath": "pages/index",
-          "text": "角色",
+          "text": "首页",
           "iconPath": "../static/images/tab-home.png",
           "selectedIconPath": "../static/images/tab-home-active.png"
+        },
+        {
+          "pagePath": "pages/characters",
+          "text": "角色",
+          "iconPath": "../static/images/tab-chat.png",
+          "selectedIconPath": "../static/images/tab-chat-active.png"
         },
         {
           "pagePath": "pages/conversations",
