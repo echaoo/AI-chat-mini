@@ -102,9 +102,8 @@ createPage({
         console.log('自定义角色数据:', myChars)
         console.log('官方角色数据:', officialChars)
 
-        // 后端返回的数据格式是 { list: [...] }
-        this.myCharacters = myChars?.list || myChars || []
-        this.officialCharacters = officialChars?.list || officialChars || []
+        this.myCharacters = myChars || []
+        this.officialCharacters = officialChars || []
       } catch (err: any) {
         this.error = err.message || '加载失败'
         console.error('加载角色列表失败:', err)
