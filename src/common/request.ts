@@ -29,28 +29,29 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
     header['Authorization'] = `Bearer ${TEST_TOKEN}`
   }
 
-  return new Promise((resolve, reject) => {
-    mpx.request({
-      url: `${API_BASE_URL}${url}`,
-      method,
-      data,
-      header: {
-        'Content-Type': 'application/json',
-        ...header
-      },
-      timeout: REQUEST_TIMEOUT,
-      success: (res: any) => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-        } else {
-          const error = new Error(res.data?.message || '请求失败')
-          reject(error)
-        }
-      },
-      fail: (err: any) => {
-        reject(new Error(err.errMsg || '网络请求失败'))
+  return mpx.request({
+    url: `${API_BASE_URL}${url}`,
+    method,
+    data,
+    header: {
+      'Content-Type': 'application/json',
+      ...header
+    },
+    timeout: REQUEST_TIMEOUT
+  }).then((res: any) => {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      // 后端返回格式：{ code, success, status, data }
+      // 提取 data 字段
+      const responseData = res.data
+      if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+        return responseData.data
       }
-    })
+      return responseData
+    } else {
+      throw new Error(res.data?.message || '请求失败')
+    }
+  }).catch((err: any) => {
+    throw new Error(err.errMsg || err.message || '网络请求失败')
   })
 }
 

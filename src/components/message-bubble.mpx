@@ -1,13 +1,9 @@
 <template>
   <view class="message-bubble {{message.role === 'user' ? 'user-message' : 'assistant-message'}}">
-    <image wx:if="{{message.role === 'assistant'}}" class="avatar" src="{{avatarUrl}}" mode="aspectFill" />
-
     <view class="bubble">
       <text class="content">{{message.content}}</text>
       <text class="time">{{formatTime(message.createdAt)}}</text>
     </view>
-
-    <image wx:if="{{message.role === 'user'}}" class="avatar" src="/static/images/user-avatar.png" mode="aspectFill" />
   </view>
 </template>
 
@@ -19,10 +15,6 @@ createComponent({
     message: {
       type: Object,
       value: {}
-    },
-    avatarUrl: {
-      type: String,
-      value: ''
     }
   },
 
@@ -40,16 +32,8 @@ createComponent({
 <style lang="stylus">
 .message-bubble
   display flex
-  align-items flex-end
   margin-bottom 32rpx
   padding 0 32rpx
-
-  .avatar
-    width 80rpx
-    height 80rpx
-    border-radius 40rpx
-    background #f5f5f5
-    flex-shrink 0
 
   .bubble
     max-width 500rpx
@@ -71,9 +55,6 @@ createComponent({
 .assistant-message
   justify-content flex-start
 
-  .avatar
-    margin-right 16rpx
-
   .bubble
     background #fff
     box-shadow 0 2rpx 8rpx rgba(0, 0, 0, 0.05)
@@ -83,9 +64,6 @@ createComponent({
 
 .user-message
   justify-content flex-end
-
-  .avatar
-    margin-left 16rpx
 
   .bubble
     background #667eea

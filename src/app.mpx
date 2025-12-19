@@ -15,7 +15,8 @@ createApp({})
     "pages": [
       "./pages/index",
       "./pages/chat",
-      "./pages/conversations"
+      "./pages/conversations",
+      "./pages/create-character"
     ],
     "tabBar": {
       "color": "#999",

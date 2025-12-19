@@ -139,26 +139,31 @@ createPage({
       const content = this.inputText.trim()
       if (!content || this.sending) return
 
-      // 添加用户消息到列表
-      const userMessage: Message = {
-        id: Date.now(),
-        conversationId: this.conversationId,
-        role: 'user',
-        content,
-        tokens: null,
-        createdAt: new Date().toISOString()
-      }
-      this.messages = [...this.messages, userMessage]
       this.inputText = ''
-      this.scrollToBottom()
-
-      // 发送消息
       this.sending = true
+
       try {
         const response = await conversationApi.sendMessage(this.conversationId, content)
+        console.log('发送消息响应:', response)
 
-        // 添加 AI 回复
-        this.messages = [...this.messages, response]
+        // 后端返回格式: { userMessage, assistantMessage, pointsConsumed, pointsBalance }
+        if (response.userMessage && response.assistantMessage) {
+          // 同时添加用户消息和助手消息
+          this.messages = [
+            ...this.messages,
+            response.userMessage,
+            response.assistantMessage
+          ]
+
+          // 可以显示积分消耗信息（可选）
+          if (response.pointsConsumed) {
+            console.log(`消耗积分: ${response.pointsConsumed}, 剩余: ${response.pointsBalance}`)
+          }
+        } else {
+          // 兼容旧格式：直接返回单个消息对象
+          this.messages = [...this.messages, response]
+        }
+
         this.scrollToBottom()
       } catch (err: any) {
         console.error('发送消息失败:', err)

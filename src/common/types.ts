@@ -17,6 +17,15 @@ export interface Character {
   updatedAt: string
 }
 
+// 创建角色请求
+export interface CreateCharacterRequest {
+  name: string
+  description?: string
+  systemPrompt: string
+  greetingMessage?: string
+  avatarUrl?: string
+}
+
 // 对话
 export interface Conversation {
   id: number

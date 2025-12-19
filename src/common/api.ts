@@ -2,7 +2,7 @@
  * API 接口封装
  */
 import { get, post, del } from './request'
-import type { Character, Conversation, Message } from './types'
+import type { Character, Conversation, Message, CreateCharacterRequest } from './types'
 
 /**
  * 角色相关 API
@@ -16,10 +16,24 @@ export const characterApi = {
   },
 
   /**
+   * 获取我的自定义角色列表
+   */
+  getMyCharacters(): Promise<Character[]> {
+    return get<Character[]>('/companion/characters/my')
+  },
+
+  /**
    * 获取角色详情
    */
   getCharacterDetail(id: number): Promise<Character> {
     return get<Character>(`/companion/characters/${id}`, false)
+  },
+
+  /**
+   * 创建自定义角色
+   */
+  createCharacter(data: CreateCharacterRequest): Promise<Character> {
+    return post<Character>('/companion/characters', data)
   }
 }
 
