@@ -3,7 +3,7 @@
     <view class="content-wrapper">
       <view class="text-card">
         <view class="card-corner-tab">祁煜</view>
-        <text class="card-text">怎么不说话？是没看到我吗？</text>
+        <text class="card-text">{{greetingText}}</text>
       </view>
       <view class="button-group">
         <button class="btn secondary-button">哄睡</button>
@@ -29,13 +29,143 @@
 
 <script lang="ts">
 import { createPage } from '@mpxjs/core'
+import { getGreeting } from '../common/greetings'
+import { conversationApi } from '../common/api'
+
+const GREETING_CACHE_KEY = 'greeting_cache'
+const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours
+const CONVERSATION_CACHE_KEY = 'last_conversation_id'
+const GREETING_COMMAND = '[GET_GREETING]'
 
 createPage({
-  data: {},
+  data: {
+    greetingText: '你好' // Provide a default value
+  },
 
-  onLoad() {},
+  // 用于取消预取任务的标记
+  _isUnloaded: false,
+
+  onLoad() {
+    this._isUnloaded = false
+    this.updateAndDisplayGreeting()
+  },
+
+  onUnload() {
+    // 标记页面已卸载，防止异步回调继续执行
+    this._isUnloaded = true
+  },
 
   methods: {
+    /**
+     * @description 更新并显示问候语
+     * 1. 优先从缓存读取，若有效且未使用过，则显示并标记为已使用
+     * 2. 否则从静态库随机读取
+     * 3. 触发后台预取新文案
+     */
+    updateAndDisplayGreeting() {
+      try {
+        const cached = wx.getStorageSync(GREETING_CACHE_KEY)
+        const now = Date.now()
+
+        // 检查缓存是否存在、未过期、且未使用过
+        if (cached && !cached.used && now - cached.timestamp < GREETING_CACHE_DURATION_MS) {
+          this.greetingText = cached.text
+          console.log('使用了缓存的问候语')
+
+          // 标记为已使用
+          cached.used = true
+          wx.setStorageSync(GREETING_CACHE_KEY, cached)
+        } else {
+          // 缓存无效或已使用，从静态库随机取一个（传入角色标识）
+          this.greetingText = getGreeting('qiyu') // TODO: 动态获取当前角色
+          console.log('使用了静态的问候语')
+        }
+      } catch (e) {
+        // 如果读取缓存失败，同样使用静态文案
+        this.greetingText = getGreeting('qiyu')
+      }
+
+      // 后台预取下一条问候语（供下次使用）
+      this.fetchAndCacheNewGreeting()
+    },
+
+    /**
+     * @description 后台预取新的问候语并存入缓存
+     * 调用 sendMessage API 获取 AI 生成的问候语
+     */
+    fetchAndCacheNewGreeting() {
+      // 延迟执行，不阻塞 UI
+      setTimeout(async () => {
+        // 检查页面是否已卸载
+        if (this._isUnloaded) {
+          console.log('页面已卸载，取消预取问候语')
+          return
+        }
+
+        console.log('后台开始预取新的问候语...')
+
+        // 从缓存获取 conversationId
+        let conversationId: number | null = null
+        try {
+          conversationId = wx.getStorageSync(CONVERSATION_CACHE_KEY)
+        } catch (e) {
+          console.log('读取 conversationId 缓存失败')
+        }
+
+        // 如果没有 conversationId，降级使用静态文案
+        if (!conversationId) {
+          console.log('无 conversationId，使用静态问候语')
+          const newGreeting = getGreeting('qiyu')
+          this.saveGreetingToCache(newGreeting)
+          return
+        }
+
+        // 调用 API 获取问候语
+        try {
+          const response = await conversationApi.sendMessage(conversationId, GREETING_COMMAND)
+
+          // 再次检查页面状态
+          if (this._isUnloaded) return
+
+          const newGreeting = response.assistantMessage.content
+
+          if (newGreeting) {
+            this.saveGreetingToCache(newGreeting)
+            console.log('API 问候语已缓存:', newGreeting)
+          }
+        } catch (error: any) {
+          if (this._isUnloaded) return
+
+          console.error('获取问候语失败，降级使用静态文案:', error.message)
+          // API 调用失败，降级使用静态文案
+          const fallbackGreeting = getGreeting('qiyu')
+          this.saveGreetingToCache(fallbackGreeting)
+        }
+      }, 1000) // 延迟1秒执行
+    },
+
+    /**
+     * @description 将问候语保存到缓存
+     */
+    saveGreetingToCache(text: string) {
+      // 页面已卸载时不执行
+      if (this._isUnloaded) return
+
+      const newCache = {
+        text,
+        timestamp: Date.now(),
+        used: false // 新缓存的问候语未使用
+      }
+
+      wx.setStorage({
+        key: GREETING_CACHE_KEY,
+        data: newCache,
+        success: () => {
+          console.log('问候语已缓存:', text)
+        }
+      })
+    },
+
     navigateToChat() {
       wx.navigateTo({
         url: '/pages/chat'

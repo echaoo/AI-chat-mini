@@ -49,6 +49,15 @@ export interface Message {
   createdAt: string
 }
 
+// 发送消息响应
+export interface SendMessageResponse {
+  userMessage: Message | null
+  assistantMessage: Message
+  pointsConsumed: number
+  pointsBalance: number
+  isGreeting?: boolean // 是否为问候语响应
+}
+
 // 用户信息
 export interface UserInfo {
   id: number

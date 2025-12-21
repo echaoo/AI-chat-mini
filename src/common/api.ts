@@ -2,7 +2,7 @@
  * API 接口封装
  */
 import { get, post, del } from './request'
-import type { Character, Conversation, Message, CreateCharacterRequest } from './types'
+import type { Character, Conversation, Message, CreateCharacterRequest, SendMessageResponse } from './types'
 
 /**
  * 角色相关 API
@@ -65,8 +65,8 @@ export const conversationApi = {
   /**
    * 发送消息
    */
-  sendMessage(conversationId: number, content: string): Promise<Message> {
-    return post<Message>(`/companion/conversations/${conversationId}/messages`, { content })
+  sendMessage(conversationId: number, content: string): Promise<SendMessageResponse> {
+    return post<SendMessageResponse>(`/companion/conversations/${conversationId}/messages`, { content })
   },
 
   /**

@@ -53,6 +53,10 @@ import { createPage } from '@mpxjs/core'
 import { characterApi, conversationApi } from '../common/api'
 import type { Character, Message } from '../common/types'
 
+const GREETING_CACHE_KEY = 'greeting_cache'
+const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours. Must be same as index.mpx
+const CONVERSATION_CACHE_KEY = 'last_conversation_id' // 用于首页预取问候语
+
 createPage({
   data: {
     characterId: 0,
@@ -79,10 +83,31 @@ createPage({
     }
   },
 
+  onUnload() {
+    // 页面卸载时，清除问候语缓存，以便下次能生成与本次聊天相关的问候语
+    try {
+      wx.removeStorageSync(GREETING_CACHE_KEY)
+      console.log('聊天结束，问候语缓存已清除。')
+    } catch (e) {
+      console.error('清除问候语缓存失败:', e)
+    }
+
+    // 缓存当前 conversationId，供首页预取问候语使用
+    if (this.conversationId) {
+      try {
+        wx.setStorageSync(CONVERSATION_CACHE_KEY, this.conversationId)
+        console.log('已缓存 conversationId:', this.conversationId)
+      } catch (e) {
+        console.error('缓存 conversationId 失败:', e)
+      }
+    }
+  },
+
   methods: {
     // 新建对话
     async init() {
       try {
+        this.loading = true
         // 加载角色信息
         this.character = await characterApi.getCharacterDetail(this.characterId)
 
@@ -90,23 +115,35 @@ createPage({
         const conversation = await conversationApi.createConversation(this.characterId)
         this.conversationId = conversation.id
 
-        // 如果有欢迎语，添加到消息列表
-        if (this.character.greetingMessage) {
-          this.messages = [{
-            id: 0,
-            conversationId: this.conversationId,
-            role: 'assistant',
-            content: this.character.greetingMessage,
-            tokens: null,
-            createdAt: new Date().toISOString()
-          }]
+        // --- 设置初始问候语 ---
+        let initialContent = this.character.greetingMessage || '你好'
+
+        // 优先尝试从缓存获取问候语，以保持与首页的一致性
+        try {
+          const cached = wx.getStorageSync(GREETING_CACHE_KEY)
+          if (cached && Date.now() - cached.timestamp < GREETING_CACHE_DURATION_MS) {
+            initialContent = cached.text
+            console.log('聊天页使用了缓存的问候语')
+          }
+        } catch (e) {
+          console.error('聊天页读取缓存失败', e)
         }
+
+        this.messages = [{
+          id: 0,
+          conversationId: this.conversationId,
+          role: 'assistant',
+          content: initialContent,
+          tokens: null,
+          createdAt: new Date().toISOString()
+        }]
 
         this.loading = false
         this.scrollToBottom()
       } catch (err: any) {
         console.error('初始化失败:', err)
         wx.showToast({ title: err.message || '初始化失败', icon: 'none' })
+        this.loading = false
       }
     },
 
@@ -156,11 +193,11 @@ createPage({
 
       try {
         // 2. 发送消息到后端，并接收助手消息
-        const assistantMessage = await conversationApi.sendMessage(this.conversationId, content)
-        
+        const response = await conversationApi.sendMessage(this.conversationId, content)
+
         // 3. 将助手消息添加到列表
-        this.messages = [...this.messages, assistantMessage]
-        
+        this.messages = [...this.messages, response.assistantMessage]
+
         this.scrollToBottom()
       } catch (err: any) {
         console.error('发送消息失败:', err)
