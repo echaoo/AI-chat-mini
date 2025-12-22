@@ -15,6 +15,10 @@ export interface Character {
   sortOrder: number
   createdAt: string
   updatedAt: string
+  // 后端返回的聊天统计字段（需要认证）
+  hasChatHistory?: boolean
+  messageCount?: number
+  likeCount?: number
 }
 
 // 创建角色请求

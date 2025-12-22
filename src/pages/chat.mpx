@@ -76,10 +76,22 @@ createPage({
   },
 
   onLoad(options: any) {
-    // 支持两种方式进入：1. 从角色列表（传 characterId）2. 从对话历史（传 conversationId）
+    // 支持三种方式进入：
+    // 1. 从角色列表（传 characterId）
+    // 2. 从对话历史（传 conversationId）
+    // 3. 从角色选择页（传 conversationId + initialMessage）
     if (options.conversationId) {
       this.conversationId = parseInt(options.conversationId)
       this.loadExistingConversation()
+
+      // 如果有初始消息，在加载完成后自动发送
+      if (options.initialMessage) {
+        const initialMessage = decodeURIComponent(options.initialMessage)
+        setTimeout(() => {
+          this.inputText = initialMessage
+          this.handleSend()
+        }, 500)
+      }
     } else if (options.characterId) {
       this.characterId = parseInt(options.characterId)
       this.init()

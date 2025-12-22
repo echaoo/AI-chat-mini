@@ -24,47 +24,82 @@
         <!-- 渐变遮罩 -->
         <view class="gradient-overlay"></view>
 
-        <!-- 角色信息 -->
-        <view class="character-info">
-          <text class="character-name">{{item.name}}</text>
-          <text class="character-desc">{{item.description}}</text>
+        <!-- 内容卡片 -->
+        <view class="content-card">
+          <!-- 角色介绍（仅首次聊天显示） -->
+          <view class="intro-section" wx:if="{{!item.hasChatHistory && item.description}}">
+            <text class="intro-label">介绍：</text>
+            <text class="intro-text">{{item.description}}</text>
+          </view>
 
-          <!-- 性格标签 -->
-          <view class="tags" wx:if="{{item.tags && item.tags.length > 0}}">
-            <view
-              wx:for="{{item.tags}}"
-              wx:for-item="tag"
-              wx:key="*this"
-              class="tag"
-            >
-              {{tag}}
+          <!-- 问候语消息 -->
+          <view class="greeting-message">
+            <text class="message-text">{{item.greetingMessage || '你好~'}}</text>
+          </view>
+
+          <!-- 角色信息和工具栏 -->
+          <view class="info-toolbar">
+            <!-- 左侧：角色和作者信息 -->
+            <view class="character-meta">
+              <text class="meta-name">{{item.name}}</text>
+              <text class="meta-author">{{item.isOfficial ? '官方' : '用户创建'}}</text>
+            </view>
+
+            <!-- 右侧：工具按钮 -->
+            <view class="action-tools">
+              <!-- 点赞 -->
+              <view class="tool-item" bindtap="handleLike" data-id="{{item.id}}">
+                <text class="tool-icon">👍</text>
+                <text class="tool-count">{{item.likeCount || 0}}</text>
+              </view>
+
+              <!-- 历史消息 -->
+              <view class="tool-item" bindtap="handleViewHistory" data-id="{{item.id}}">
+                <text class="tool-icon">💬</text>
+                <text class="tool-count">{{item.messageCount || 0}}</text>
+              </view>
+
+              <!-- 收藏 -->
+              <view
+                class="tool-item favorite-tool {{item.isFavorite ? 'active' : ''}}"
+                bindtap="handleToggleFavorite"
+                data-id="{{item.id}}"
+              >
+                <text class="tool-icon">{{item.isFavorite ? '❤️' : '🤍'}}</text>
+              </view>
+
+              <!-- 固定到首页 -->
+              <view
+                class="tool-item pin-tool {{item.isPinned ? 'active' : ''}}"
+                bindtap="handlePinToHome"
+                data-character="{{item}}"
+              >
+                <text class="tool-icon">{{item.isPinned ? '★' : '☆'}}</text>
+              </view>
             </view>
           </view>
 
-          <!-- 问候语预览 -->
-          <view class="greeting-preview">
-            <text class="greeting-icon">💬</text>
-            <text class="greeting-text">{{item.greetingMessage || '你好~'}}</text>
+          <!-- 输入框 -->
+          <view class="input-section">
+            <input
+              class="chat-input"
+              type="text"
+              placeholder="输入消息开始聊天..."
+              value="{{inputText}}"
+              bindinput="handleInput"
+              bindconfirm="handleSendMessage"
+              data-character="{{item}}"
+              confirm-type="send"
+            />
+            <button
+              class="send-btn {{inputText ? 'active' : ''}}"
+              bindtap="handleSendMessage"
+              data-character="{{item}}"
+              disabled="{{!inputText}}"
+            >
+              发送
+            </button>
           </view>
-        </view>
-
-        <!-- 操作按钮 -->
-        <view class="action-buttons">
-          <button
-            class="btn chat-btn"
-            bindtap="handleStartChat"
-            data-character="{{item}}"
-          >
-            开始聊天
-          </button>
-
-          <button
-            class="btn favorite-btn {{item.isFavorite ? 'active' : ''}}"
-            bindtap="handleToggleFavorite"
-            data-id="{{item.id}}"
-          >
-            {{item.isFavorite ? '❤️ 已收藏' : '🤍 收藏'}}
-          </button>
         </view>
       </swiper-item>
     </swiper>
@@ -89,10 +124,11 @@
 
 <script lang="ts">
 import { createPage } from '@mpxjs/core'
-import { characterApi } from '../common/api'
+import { characterApi, conversationApi } from '../common/api'
 import type { Character } from '../common/types'
 
 const FAVORITE_CHARACTERS_KEY = 'favorite_characters'
+const HOME_CHARACTER_CACHE_KEY = 'home_character'
 
 createPage({
   data: {
@@ -100,11 +136,14 @@ createPage({
     currentIndex: 0,
     showHint: true,
     favoriteIds: [] as number[],
-    favoriteCount: 0
+    favoriteCount: 0,
+    inputText: '',
+    pinnedCharacterId: null as number | null
   },
 
   onLoad() {
     this.loadFavorites()
+    this.loadPinnedCharacter()
     this.loadCharacters()
 
     // 3秒后隐藏提示
@@ -125,25 +164,16 @@ createPage({
         // 合并角色列表，官方角色在前
         const allCharacters = [...officialChars, ...myChars]
 
-        // 添加收藏状态
+        // 添加前端状态（收藏、固定）
         this.characters = allCharacters.map(char => ({
           ...char,
           isFavorite: this.favoriteIds.includes(char.id),
-          tags: this.parseCharacterTags(char.description)
+          isPinned: this.pinnedCharacterId === char.id
+          // hasChatHistory, messageCount, likeCount 由后端返回
         }))
       } catch (err: any) {
         wx.showToast({ title: '加载角色失败', icon: 'none' })
       }
-    },
-
-    // 从描述中提取标签（简单实现）
-    parseCharacterTags(description: string | null): string[] {
-      if (!description) return []
-
-      // 示例：从描述中提取关键词作为标签
-      // 实际应该在后端配置
-      const keywords = ['温柔', '治愈', '阳光', '高冷', '傲娇', '腹黑']
-      return keywords.filter(keyword => description.includes(keyword))
     },
 
     // 加载收藏列表
@@ -155,6 +185,18 @@ createPage({
       } catch (e) {
         this.favoriteIds = []
         this.favoriteCount = 0
+      }
+    },
+
+    // 加载固定到首页的角色
+    loadPinnedCharacter() {
+      try {
+        const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
+        if (cached && cached.characterId) {
+          this.pinnedCharacterId = cached.characterId
+        }
+      } catch (e) {
+        this.pinnedCharacterId = null
       }
     },
 
@@ -184,18 +226,91 @@ createPage({
       }))
     },
 
-    // 开始聊天
-    handleStartChat(e: any) {
+    // 固定到首页
+    handlePinToHome(e: any) {
       const character = e.currentTarget.dataset.character
+
+      if (this.pinnedCharacterId === character.id) {
+        // 取消固定
+        wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+        this.pinnedCharacterId = null
+        wx.showToast({ title: '已取消固定', icon: 'success' })
+      } else {
+        // 固定到首页
+        const cacheData = {
+          characterId: character.id,
+          conversationId: null, // 创建对话后会更新
+          character: {
+            id: character.id,
+            name: character.name,
+            avatarUrl: character.avatarUrl,
+            description: character.description
+          },
+          timestamp: Date.now()
+        }
+
+        wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
+        this.pinnedCharacterId = character.id
+        wx.showToast({ title: '已固定到首页', icon: 'success' })
+      }
+
+      // 更新状态
+      this.characters = this.characters.map(char => ({
+        ...char,
+        isPinned: this.pinnedCharacterId === char.id
+      }))
+    },
+
+    // 点赞
+    handleLike(e: any) {
+      wx.showToast({ title: '点赞功能开发中', icon: 'none' })
+    },
+
+    // 查看历史消息
+    handleViewHistory(e: any) {
+      const characterId = e.currentTarget.dataset.id
+      // TODO: 查询该角色的对话ID，如果有则跳转到聊天页
       wx.navigateTo({
-        url: `/pages/chat?characterId=${character.id}`
+        url: `/pages/chat?characterId=${characterId}`
       })
+    },
+
+    // 输入框内容变化
+    handleInput(e: any) {
+      this.inputText = e.detail.value
+    },
+
+    // 发送消息
+    async handleSendMessage(e: any) {
+      const character = e.currentTarget.dataset.character
+      const message = this.inputText.trim()
+
+      if (!message) {
+        return
+      }
+
+      // 创建对话并跳转到聊天页
+      try {
+        const conversation = await conversationApi.createConversation(character.id)
+
+        // 跳转到聊天页，并传递初始消息
+        wx.navigateTo({
+          url: `/pages/chat?conversationId=${conversation.id}&initialMessage=${encodeURIComponent(message)}`
+        })
+
+        // 清空输入框
+        this.inputText = ''
+      } catch (err: any) {
+        wx.showToast({ title: err.message || '创建对话失败', icon: 'none' })
+      }
     },
 
     // Swiper 切换
     handleSwiperChange(e: any) {
       this.currentIndex = e.detail.current
       this.showHint = false
+      // 切换时清空输入框
+      this.inputText = ''
     },
 
     // 返回
@@ -223,6 +338,9 @@ createPage({
   height 100vh
   position relative
   overflow hidden
+  background-image url('../assets/qiyu.jpg')
+  background-size cover
+  background-position center
 
   .character-swiper
     width 100%
@@ -232,6 +350,11 @@ createPage({
       position relative
       width 100%
       height 100%
+      display flex
+      align-items flex-end
+      padding-bottom 40rpx
+      box-sizing border-box
+      overflow hidden
 
       .bg-image
         position absolute
@@ -247,125 +370,153 @@ createPage({
         left 0
         width 100%
         height 100%
-        background linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.7))
+        background linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.8))
         z-index 2
 
-      .character-info
-        position absolute
-        bottom 280rpx
-        left 0
-        right 0
-        padding 0 48rpx
+      // 内容卡片
+      .content-card
+        position relative
         z-index 3
-        color #fff
+        width 100%
+        padding 0 32rpx
+        margin-bottom 40rpx
 
-        .character-name
-          display block
-          font-size 56rpx
-          font-weight 700
-          margin-bottom 16rpx
-          text-shadow 0 2px 8px rgba(0,0,0,0.3)
-
-        .character-desc
-          display block
-          font-size 28rpx
-          color rgba(255,255,255,0.9)
-          margin-bottom 24rpx
-          line-height 1.6
-          text-shadow 0 1px 4px rgba(0,0,0,0.3)
-
-        .tags
-          display flex
-          flex-wrap wrap
-          gap 16rpx
-          margin-bottom 32rpx
-
-          .tag
-            padding 8rpx 20rpx
-            background rgba(255,255,255,0.2)
-            backdrop-filter blur(10rpx)
-            border-radius 20rpx
-            font-size 24rpx
-            color #fff
-            border 1rpx solid rgba(255,255,255,0.3)
-
-        .greeting-preview
-          display flex
-          align-items flex-start
-          padding 24rpx
-          background rgba(255,255,255,0.15)
-          backdrop-filter blur(10rpx)
+        // 介绍部分
+        .intro-section
+          background rgba(255, 255, 255, 0.12)
+          backdrop-filter blur(20rpx)
           border-radius 20rpx
-          border 1rpx solid rgba(255,255,255,0.2)
+          padding 24rpx 28rpx
+          margin-bottom 20rpx
+          border 1rpx solid rgba(255, 255, 255, 0.15)
 
-          .greeting-icon
-            font-size 32rpx
-            margin-right 16rpx
-
-          .greeting-text
-            flex 1
+          .intro-label
             font-size 26rpx
-            color rgba(255,255,255,0.95)
-            line-height 1.5
+            color rgba(255, 255, 255, 0.7)
+            font-weight 500
+            margin-right 8rpx
 
-      .action-buttons
-        position absolute
-        bottom 100rpx
-        left 48rpx
-        right 48rpx
-        z-index 3
-        display flex
-        gap 24rpx
+          .intro-text
+            font-size 26rpx
+            color rgba(255, 255, 255, 0.95)
+            line-height 1.6
 
-        .btn
-          flex 1
-          height 96rpx
-          border-radius 48rpx
-          font-size 32rpx
-          font-weight 600
-          border none
+        // 问候语消息
+        .greeting-message
+          width 80%
+          color rgba(255, 255, 255, 0.95)
+          background-color rgba(255, 255, 255, 0.6)
+          backdrop-filter blur(20rpx)
+          border-radius 20rpx
+          padding 28rpx
+          margin-bottom 60rpx
+          border 1rpx solid rgba(255, 255, 255, 0.15)
+
+          .message-text
+            font-size 30rpx
+            color #333
+            line-height 1.6
+            display block
+
+        // 信息和工具栏
+        .info-toolbar
+          display flex
+          justify-content space-between
+          align-items center
+          margin-bottom 20rpx
+          padding 0 8rpx
+
+          .character-meta
+            display flex
+            flex-direction column
+            gap 8rpx
+
+            .meta-name
+              font-size 32rpx
+              font-weight 700
+              color #fff
+              text-shadow 0 2px 8px rgba(0,0,0,0.3)
+
+            .meta-author
+              font-size 24rpx
+              color rgba(255, 255, 255, 0.7)
+
+          .action-tools
+            display flex
+            align-items center
+            gap 24rpx
+
+            .tool-item
+              display flex
+              flex-direction column
+              align-items center
+              gap 2rpx
+              transition all 0.2s
+
+              &:active
+                transform scale(0.95)
+
+              .tool-icon
+                font-size 32rpx
+
+              .tool-count
+                font-size 20rpx
+                color rgba(255, 255, 255, 0.8)
+
+              &.favorite-tool.active
+                background rgba(255, 100, 100, 0.25)
+                border-color rgba(255, 100, 100, 0.4)
+
+              &.pin-tool.active
+                background rgba(255, 215, 0, 0.25)
+                border-color rgba(255, 215, 0, 0.4)
+
+        // 输入框部分
+        .input-section
           display flex
           align-items center
-          justify-content center
-          transition all 0.3s
+          gap 16rpx
+          background rgba(255, 255, 255, 0.12)
+          backdrop-filter blur(20rpx)
+          border-radius 16rpx
+          padding 12rpx 16rpx
+          border 1rpx solid rgba(255, 255, 255, 0.15)
 
-          &.chat-btn
-            background linear-gradient(135deg, #667eea, #764ba2)
+          .chat-input
+            flex 1
+            height 64rpx
+            background transparent
+            border none
+            font-size 28rpx
             color #fff
-            box-shadow 0 8px 24px rgba(102, 126, 234, 0.4)
+            padding 0 16rpx
 
-            &:active
-              transform scale(0.98)
-              opacity 0.9
+            &::placeholder
+              color rgba(255, 255, 255, 0.5)
 
-          &.favorite-btn
-            background rgba(255,255,255,0.2)
-            backdrop-filter blur(10rpx)
-            color #fff
-            border 2rpx solid rgba(255,255,255,0.3)
+          .send-btn
+            height 64rpx
+            padding 0 32rpx
+            background rgba(255, 255, 255, 0.15)
+            color rgba(255, 255, 255, 0.6)
+            border-radius 32rpx
+            font-size 28rpx
+            border none
+            transition all 0.2s
 
             &.active
-              background rgba(255,100,100,0.3)
-              border-color rgba(255,100,100,0.5)
+              background linear-gradient(135deg, #667eea, #764ba2)
+              color #fff
 
             &:active
               transform scale(0.98)
 
-      .character-indicator
-        position absolute
-        top 120rpx
-        right 48rpx
-        z-index 3
-        padding 12rpx 24rpx
-        background rgba(0,0,0,0.3)
-        backdrop-filter blur(10rpx)
-        border-radius 20rpx
-        color #fff
-        font-size 24rpx
+            &[disabled]
+              opacity 0.5
 
   .swipe-hint
     position absolute
-    bottom 240rpx
+    bottom 320rpx
     left 50%
     transform translateX(-50%)
     z-index 4
@@ -380,7 +531,7 @@ createPage({
       display block
       margin-top 8rpx
       font-size 24rpx
-      color rgba(255,255,255,0.9)
+      color rgba(255, 255, 255, 0.9)
       text-shadow 0 1px 4px rgba(0,0,0,0.3)
 
   .top-nav
