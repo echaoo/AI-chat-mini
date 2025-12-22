@@ -65,6 +65,17 @@ export interface Message {
   createdAt: string
 }
 
+// 获取对话消息响应
+export interface ConversationMessagesResponse {
+  conversationId: number
+  character: {
+    id: number
+    name: string
+    avatarUrl: string
+  }
+  messages: Message[]
+}
+
 // 发送消息响应
 export interface SendMessageResponse {
   userMessage: Message | null

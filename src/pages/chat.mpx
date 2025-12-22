@@ -154,20 +154,36 @@ createPage({
     // 加载已有对话
     async loadExistingConversation() {
       try {
-        // 加载消息历史
-        const messages = await conversationApi.getConversationMessages(this.conversationId)
-        this.messages = messages
+        this.loading = true
 
-        // 从消息中获取角色信息（如果有的话）
-        if (messages.length > 0) {
-          // 这里需要从对话 API 获取角色 ID，暂时从第一条消息推断
-          // TODO: 后端可以在 getConversationMessages 返回中包含对话信息
+        // 加载对话信息和消息历史
+        const response = await conversationApi.getConversationMessages(this.conversationId)
+
+        // 保存角色信息
+        this.character = {
+          id: response.character.id,
+          name: response.character.name,
+          avatarUrl: response.character.avatarUrl,
+          description: null,
+          greetingMessage: null,
+          systemPrompt: '',
+          isOfficial: 1,
+          isActive: 1,
+          sortOrder: 0,
+          createdAt: '',
+          updatedAt: ''
         }
+        this.characterId = response.character.id
+
+        // 保存消息列表
+        this.messages = response.messages || []
 
         this.loading = false
+        this.checkIfPinned() // 检查是否已固定
         this.scrollToBottom()
       } catch (err: any) {
         wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+        this.loading = false
       }
     },
 
