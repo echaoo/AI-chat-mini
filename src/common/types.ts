@@ -76,6 +76,7 @@ export interface ConversationMessagesResponse {
   messages: Message[]
 }
 
+
 // 发送消息响应
 export interface SendMessageResponse {
   userMessage: Message | null

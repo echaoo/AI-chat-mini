@@ -56,10 +56,9 @@
 <script lang="ts">
 import { createPage } from '@mpxjs/core'
 import { characterApi, conversationApi } from '../common/api'
-import type { Character, Message } from '../common/types'
+import type { Character, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
 
 const GREETING_CACHE_KEY = 'greeting_cache'
-const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours. Must be same as index.mpx
 const CONVERSATION_CACHE_KEY = 'last_conversation_id' // 用于首页预取问候语
 const HOME_CHARACTER_CACHE_KEY = 'home_character' // 首页固定角色缓存
 
@@ -117,7 +116,7 @@ createPage({
         this.character = await characterApi.getCharacterDetail(this.characterId)
 
         // 创建对话（后端会返回消息列表：首次用 greeting，有历史则返回最近 20 条）
-        const conversation = await conversationApi.createConversation(this.characterId)
+        const conversation: CreateConversationResponse = await conversationApi.createConversation(this.characterId)
         this.conversationId = conversation.id
 
         // 使用后端返回的消息列表
@@ -157,7 +156,7 @@ createPage({
         this.loading = true
 
         // 加载对话信息和消息历史
-        const response = await conversationApi.getConversationMessages(this.conversationId)
+        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId)
 
         // 保存角色信息
         this.character = {
@@ -212,7 +211,7 @@ createPage({
 
       try {
         // 2. 发送消息到后端，并接收助手消息
-        const response = await conversationApi.sendMessage(this.conversationId, content)
+        const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
 
         // 3. 将助手消息添加到列表
         this.messages = [...this.messages, response.assistantMessage]

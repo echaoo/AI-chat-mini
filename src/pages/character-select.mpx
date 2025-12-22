@@ -1,0 +1,421 @@
+<template>
+  <view class="container">
+    <!-- 全屏滑动容器 -->
+    <swiper
+      class="character-swiper"
+      vertical
+      indicator-dots="{{false}}"
+      current="{{currentIndex}}"
+      bindchange="handleSwiperChange"
+      circular="{{false}}"
+    >
+      <swiper-item
+        wx:for="{{characters}}"
+        wx:key="id"
+        class="swiper-item"
+      >
+        <!-- 角色背景图 -->
+        <image
+          class="bg-image"
+          src="{{item.avatarUrl || '/assets/default-avatar.png'}}"
+          mode="aspectFill"
+        />
+
+        <!-- 渐变遮罩 -->
+        <view class="gradient-overlay"></view>
+
+        <!-- 角色信息 -->
+        <view class="character-info">
+          <text class="character-name">{{item.name}}</text>
+          <text class="character-desc">{{item.description}}</text>
+
+          <!-- 性格标签 -->
+          <view class="tags" wx:if="{{item.tags && item.tags.length > 0}}">
+            <view
+              wx:for="{{item.tags}}"
+              wx:for-item="tag"
+              wx:key="*this"
+              class="tag"
+            >
+              {{tag}}
+            </view>
+          </view>
+
+          <!-- 问候语预览 -->
+          <view class="greeting-preview">
+            <text class="greeting-icon">💬</text>
+            <text class="greeting-text">{{item.greetingMessage || '你好~'}}</text>
+          </view>
+        </view>
+
+        <!-- 操作按钮 -->
+        <view class="action-buttons">
+          <button
+            class="btn chat-btn"
+            bindtap="handleStartChat"
+            data-character="{{item}}"
+          >
+            开始聊天
+          </button>
+
+          <button
+            class="btn favorite-btn {{item.isFavorite ? 'active' : ''}}"
+            bindtap="handleToggleFavorite"
+            data-id="{{item.id}}"
+          >
+            {{item.isFavorite ? '❤️ 已收藏' : '🤍 收藏'}}
+          </button>
+        </view>
+      </swiper-item>
+    </swiper>
+
+    <!-- 滑动提示（仅首次显示） -->
+    <view class="swipe-hint" wx:if="{{showHint}}">
+      <view class="hint-arrow">↑</view>
+      <text class="hint-text">上下滑动查看更多角色</text>
+    </view>
+
+    <!-- 顶部导航栏 -->
+    <view class="top-nav">
+      <view class="nav-btn" bindtap="handleGoBack">
+        <text class="nav-icon">←</text>
+      </view>
+      <view class="nav-btn" bindtap="handleViewFavorites">
+        <text class="nav-icon">❤️</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script lang="ts">
+import { createPage } from '@mpxjs/core'
+import { characterApi } from '../common/api'
+import type { Character } from '../common/types'
+
+const FAVORITE_CHARACTERS_KEY = 'favorite_characters'
+
+createPage({
+  data: {
+    characters: [] as Character[],
+    currentIndex: 0,
+    showHint: true,
+    favoriteIds: [] as number[],
+    favoriteCount: 0
+  },
+
+  onLoad() {
+    this.loadFavorites()
+    this.loadCharacters()
+
+    // 3秒后隐藏提示
+    setTimeout(() => {
+      this.showHint = false
+    }, 3000)
+  },
+
+  methods: {
+    // 加载角色列表
+    async loadCharacters() {
+      try {
+        const [myChars, officialChars] = await Promise.all([
+          characterApi.getMyCharacters().catch(() => []),
+          characterApi.getOfficialCharacters().catch(() => [])
+        ])
+
+        // 合并角色列表，官方角色在前
+        const allCharacters = [...officialChars, ...myChars]
+
+        // 添加收藏状态
+        this.characters = allCharacters.map(char => ({
+          ...char,
+          isFavorite: this.favoriteIds.includes(char.id),
+          tags: this.parseCharacterTags(char.description)
+        }))
+      } catch (err: any) {
+        wx.showToast({ title: '加载角色失败', icon: 'none' })
+      }
+    },
+
+    // 从描述中提取标签（简单实现）
+    parseCharacterTags(description: string | null): string[] {
+      if (!description) return []
+
+      // 示例：从描述中提取关键词作为标签
+      // 实际应该在后端配置
+      const keywords = ['温柔', '治愈', '阳光', '高冷', '傲娇', '腹黑']
+      return keywords.filter(keyword => description.includes(keyword))
+    },
+
+    // 加载收藏列表
+    loadFavorites() {
+      try {
+        const favorites = wx.getStorageSync(FAVORITE_CHARACTERS_KEY) || []
+        this.favoriteIds = favorites
+        this.favoriteCount = favorites.length
+      } catch (e) {
+        this.favoriteIds = []
+        this.favoriteCount = 0
+      }
+    },
+
+    // 切换收藏
+    handleToggleFavorite(e: any) {
+      const characterId = e.currentTarget.dataset.id
+      const index = this.favoriteIds.indexOf(characterId)
+
+      if (index > -1) {
+        // 取消收藏
+        this.favoriteIds.splice(index, 1)
+        wx.showToast({ title: '已取消收藏', icon: 'none' })
+      } else {
+        // 添加收藏
+        this.favoriteIds.push(characterId)
+        wx.showToast({ title: '已加入收藏', icon: 'success' })
+      }
+
+      // 保存到本地
+      wx.setStorageSync(FAVORITE_CHARACTERS_KEY, this.favoriteIds)
+      this.favoriteCount = this.favoriteIds.length
+
+      // 更新当前角色的收藏状态
+      this.characters = this.characters.map(char => ({
+        ...char,
+        isFavorite: this.favoriteIds.includes(char.id)
+      }))
+    },
+
+    // 开始聊天
+    handleStartChat(e: any) {
+      const character = e.currentTarget.dataset.character
+      wx.navigateTo({
+        url: `/pages/chat?characterId=${character.id}`
+      })
+    },
+
+    // Swiper 切换
+    handleSwiperChange(e: any) {
+      this.currentIndex = e.detail.current
+      this.showHint = false
+    },
+
+    // 返回
+    handleGoBack() {
+      wx.navigateBack()
+    },
+
+    // 查看收藏列表
+    handleViewFavorites() {
+      if (this.favoriteCount === 0) {
+        wx.showToast({ title: '还没有收藏角色', icon: 'none' })
+        return
+      }
+
+      // TODO: 跳转到收藏列表页
+      wx.showToast({ title: '收藏列表功能开发中', icon: 'none' })
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+.container
+  width 100vw
+  height 100vh
+  position relative
+  overflow hidden
+
+  .character-swiper
+    width 100%
+    height 100%
+
+    .swiper-item
+      position relative
+      width 100%
+      height 100%
+
+      .bg-image
+        position absolute
+        top 0
+        left 0
+        width 100%
+        height 100%
+        z-index 1
+
+      .gradient-overlay
+        position absolute
+        top 0
+        left 0
+        width 100%
+        height 100%
+        background linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.7))
+        z-index 2
+
+      .character-info
+        position absolute
+        bottom 280rpx
+        left 0
+        right 0
+        padding 0 48rpx
+        z-index 3
+        color #fff
+
+        .character-name
+          display block
+          font-size 56rpx
+          font-weight 700
+          margin-bottom 16rpx
+          text-shadow 0 2px 8px rgba(0,0,0,0.3)
+
+        .character-desc
+          display block
+          font-size 28rpx
+          color rgba(255,255,255,0.9)
+          margin-bottom 24rpx
+          line-height 1.6
+          text-shadow 0 1px 4px rgba(0,0,0,0.3)
+
+        .tags
+          display flex
+          flex-wrap wrap
+          gap 16rpx
+          margin-bottom 32rpx
+
+          .tag
+            padding 8rpx 20rpx
+            background rgba(255,255,255,0.2)
+            backdrop-filter blur(10rpx)
+            border-radius 20rpx
+            font-size 24rpx
+            color #fff
+            border 1rpx solid rgba(255,255,255,0.3)
+
+        .greeting-preview
+          display flex
+          align-items flex-start
+          padding 24rpx
+          background rgba(255,255,255,0.15)
+          backdrop-filter blur(10rpx)
+          border-radius 20rpx
+          border 1rpx solid rgba(255,255,255,0.2)
+
+          .greeting-icon
+            font-size 32rpx
+            margin-right 16rpx
+
+          .greeting-text
+            flex 1
+            font-size 26rpx
+            color rgba(255,255,255,0.95)
+            line-height 1.5
+
+      .action-buttons
+        position absolute
+        bottom 100rpx
+        left 48rpx
+        right 48rpx
+        z-index 3
+        display flex
+        gap 24rpx
+
+        .btn
+          flex 1
+          height 96rpx
+          border-radius 48rpx
+          font-size 32rpx
+          font-weight 600
+          border none
+          display flex
+          align-items center
+          justify-content center
+          transition all 0.3s
+
+          &.chat-btn
+            background linear-gradient(135deg, #667eea, #764ba2)
+            color #fff
+            box-shadow 0 8px 24px rgba(102, 126, 234, 0.4)
+
+            &:active
+              transform scale(0.98)
+              opacity 0.9
+
+          &.favorite-btn
+            background rgba(255,255,255,0.2)
+            backdrop-filter blur(10rpx)
+            color #fff
+            border 2rpx solid rgba(255,255,255,0.3)
+
+            &.active
+              background rgba(255,100,100,0.3)
+              border-color rgba(255,100,100,0.5)
+
+            &:active
+              transform scale(0.98)
+
+      .character-indicator
+        position absolute
+        top 120rpx
+        right 48rpx
+        z-index 3
+        padding 12rpx 24rpx
+        background rgba(0,0,0,0.3)
+        backdrop-filter blur(10rpx)
+        border-radius 20rpx
+        color #fff
+        font-size 24rpx
+
+  .swipe-hint
+    position absolute
+    bottom 240rpx
+    left 50%
+    transform translateX(-50%)
+    z-index 4
+    text-align center
+
+    .hint-arrow
+      font-size 48rpx
+      color #fff
+      text-shadow 0 2px 8px rgba(0,0,0,0.3)
+
+    .hint-text
+      display block
+      margin-top 8rpx
+      font-size 24rpx
+      color rgba(255,255,255,0.9)
+      text-shadow 0 1px 4px rgba(0,0,0,0.3)
+
+  .top-nav
+    position fixed
+    top 0
+    left 0
+    right 0
+    padding 160rpx 32rpx 32rpx 32rpx
+    display flex
+    justify-content space-between
+    align-items center
+    z-index 5
+
+    .nav-btn
+      position relative
+      width 80rpx
+      height 80rpx
+      background rgba(0,0,0,0.3)
+      backdrop-filter blur(10rpx)
+      border-radius 50%
+      display flex
+      align-items center
+      justify-content center
+      border 1rpx solid rgba(255,255,255,0.2)
+
+      .nav-icon
+        font-size 36rpx
+        color #fff
+
+</style>
+
+<script type="application/json">
+{
+  "navigationStyle": "custom",
+  "navigationBarTextStyle": "white",
+  "usingComponents": {}
+}
+</script>

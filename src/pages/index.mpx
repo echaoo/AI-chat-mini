@@ -14,13 +14,13 @@
 
     <!-- New Side Navigation -->
     <view class="side-nav">
-      <view class="side-nav-item" bindtap="navigateToCharacters">
-        <text class="side-nav-text">角色</text>
+      <view class="side-nav-item" bindtap="navigateToCharacterSelect">
+        <text class="side-nav-text">换角色</text>
       </view>
       <view class="side-nav-item" bindtap="navigateToConversations">
         <text class="side-nav-text">消息</text>
       </view>
-      <view class="side-nav-item" bindtap="navigateToConversations">
+      <view class="side-nav-item" bindtap="navigateToCharacters">
         <text class="side-nav-text">广场</text>
       </view>
     </view>
@@ -203,6 +203,11 @@ createPage({
           url: `/pages/chat?characterId=${this.characterId}`
         })
       }
+    },
+    navigateToCharacterSelect() {
+      wx.navigateTo({
+        url: '/pages/character-select'
+      })
     },
     navigateToCharacters() {
       wx.navigateTo({
