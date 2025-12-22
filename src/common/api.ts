@@ -2,7 +2,7 @@
  * API 接口封装
  */
 import { get, post, del } from './request'
-import type { Character, Conversation, Message, CreateCharacterRequest, SendMessageResponse } from './types'
+import type { Character, Conversation, CreateConversationResponse, Message, CreateCharacterRequest, SendMessageResponse } from './types'
 
 /**
  * 角色相关 API
@@ -50,9 +50,10 @@ export const conversationApi = {
 
   /**
    * 创建新对话
+   * 返回对话信息和初始消息列表（首次用 greeting，有历史则返回最近 20 条）
    */
-  createConversation(characterId: number): Promise<Conversation> {
-    return post<Conversation>('/companion/conversations', { characterId })
+  createConversation(characterId: number): Promise<CreateConversationResponse> {
+    return post<CreateConversationResponse>('/companion/conversations', { characterId })
   },
 
   /**

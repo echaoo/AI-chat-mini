@@ -39,6 +39,22 @@ export interface Conversation {
   character?: Character
 }
 
+// 创建对话响应（包含初始消息）
+export interface CreateConversationResponse {
+  id: number
+  characterId: number
+  userId: number
+  title: string | null
+  createdAt: string
+  isFirstTimeChat: boolean // 是否首次与该角色聊天
+  messages: Array<{
+    id: number
+    role: 'user' | 'assistant'
+    content: string
+    createdAt: string
+  }>
+}
+
 // 消息
 export interface Message {
   id: number

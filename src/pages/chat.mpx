@@ -17,7 +17,6 @@
           wx:key="id"
           id="msg-{{item.id}}"
           message="{{item}}"
-          avatarUrl="{{character.avatarUrl}}"
         />
       </view>
 
@@ -111,32 +110,33 @@ createPage({
         // 加载角色信息
         this.character = await characterApi.getCharacterDetail(this.characterId)
 
-        // 创建对话
+        // 创建对话（后端会返回消息列表：首次用 greeting，有历史则返回最近 20 条）
         const conversation = await conversationApi.createConversation(this.characterId)
         this.conversationId = conversation.id
 
-        // --- 设置初始问候语 ---
-        let initialContent = this.character.greetingMessage || '你好'
-
-        // 优先尝试从缓存获取问候语，以保持与首页的一致性
-        try {
-          const cached = wx.getStorageSync(GREETING_CACHE_KEY)
-          if (cached && Date.now() - cached.timestamp < GREETING_CACHE_DURATION_MS) {
-            initialContent = cached.text
-            console.log('聊天页使用了缓存的问候语')
-          }
-        } catch (e) {
-          console.error('聊天页读取缓存失败', e)
+        // 使用后端返回的消息列表
+        if (conversation.messages && conversation.messages.length > 0) {
+          this.messages = conversation.messages.map((msg: any) => ({
+            id: msg.id,
+            conversationId: this.conversationId,
+            role: msg.role,
+            content: msg.content,
+            tokens: null,
+            createdAt: msg.createdAt
+          }))
+        } else {
+          // 兜底：如果后端没返回消息，使用角色的 greetingMessage
+          this.messages = [{
+            id: 0,
+            conversationId: this.conversationId,
+            role: 'assistant',
+            content: this.character.greetingMessage || '你好',
+            tokens: null,
+            createdAt: new Date().toISOString()
+          }]
         }
 
-        this.messages = [{
-          id: 0,
-          conversationId: this.conversationId,
-          role: 'assistant',
-          content: initialContent,
-          tokens: null,
-          createdAt: new Date().toISOString()
-        }]
+        console.log('创建对话成功，isFirstTimeChat:', conversation.isFirstTimeChat, '消息数:', this.messages.length)
 
         this.loading = false
         this.scrollToBottom()

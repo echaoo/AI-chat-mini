@@ -167,9 +167,26 @@ createPage({
     },
 
     navigateToChat() {
-      wx.navigateTo({
-        url: '/pages/chat'
-      })
+      // 优先使用缓存的 conversationId（复用已有对话）
+      let conversationId: number | null = null
+      try {
+        conversationId = wx.getStorageSync(CONVERSATION_CACHE_KEY)
+      } catch (e) {
+        console.log('读取 conversationId 缓存失败')
+      }
+
+      if (conversationId) {
+        // 有缓存的对话，复用
+        wx.navigateTo({
+          url: `/pages/chat?conversationId=${conversationId}`
+        })
+      } else {
+        // 没有缓存，创建新对话
+        const characterId = 4 // TODO: 动态获取当前角色 ID
+        wx.navigateTo({
+          url: `/pages/chat?characterId=${characterId}`
+        })
+      }
     },
     navigateToCharacters() {
       wx.navigateTo({
