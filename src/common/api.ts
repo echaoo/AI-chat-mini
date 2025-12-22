@@ -11,15 +11,17 @@ export const characterApi = {
   /**
    * 获取官方角色列表
    */
-  getOfficialCharacters(): Promise<Character[]> {
-    return get<Character[]>('/companion/characters/official', false)
+  async getOfficialCharacters(): Promise<Character[]> {
+    const result = await get<{ list: Character[] }>('/companion/characters/official', false)
+    return result?.list || []
   },
 
   /**
    * 获取我的自定义角色列表
    */
-  getMyCharacters(): Promise<Character[]> {
-    return get<Character[]>('/companion/characters/my')
+  async getMyCharacters(): Promise<Character[]> {
+    const result = await get<{ list: Character[] }>('/companion/characters/my')
+    return result?.list || []
   },
 
   /**

@@ -37,6 +37,12 @@
         disabled="{{sending}}"
       />
       <button
+        class="pin-btn {{isPinned ? 'pinned' : ''}}"
+        bindtap="handlePinToHome"
+      >
+        {{isPinned ? '★' : '☆'}}
+      </button>
+      <button
         class="send-btn {{inputText ? 'active' : ''}}"
         bindtap="handleSend"
         disabled="{{sending || !inputText}}"
@@ -55,6 +61,7 @@ import type { Character, Message } from '../common/types'
 const GREETING_CACHE_KEY = 'greeting_cache'
 const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours. Must be same as index.mpx
 const CONVERSATION_CACHE_KEY = 'last_conversation_id' // 用于首页预取问候语
+const HOME_CHARACTER_CACHE_KEY = 'home_character' // 首页固定角色缓存
 
 createPage({
   data: {
@@ -65,7 +72,8 @@ createPage({
     inputText: '',
     loading: true,
     sending: false,
-    scrollToView: ''
+    scrollToView: '',
+    isPinned: false // 是否已固定到首页
   },
 
   onLoad(options: any) {
@@ -86,18 +94,16 @@ createPage({
     // 页面卸载时，清除问候语缓存，以便下次能生成与本次聊天相关的问候语
     try {
       wx.removeStorageSync(GREETING_CACHE_KEY)
-      console.log('聊天结束，问候语缓存已清除。')
     } catch (e) {
-      console.error('清除问候语缓存失败:', e)
+      // 忽略错误
     }
 
     // 缓存当前 conversationId，供首页预取问候语使用
     if (this.conversationId) {
       try {
         wx.setStorageSync(CONVERSATION_CACHE_KEY, this.conversationId)
-        console.log('已缓存 conversationId:', this.conversationId)
       } catch (e) {
-        console.error('缓存 conversationId 失败:', e)
+        // 忽略错误
       }
     }
   },
@@ -136,12 +142,10 @@ createPage({
           }]
         }
 
-        console.log('创建对话成功，isFirstTimeChat:', conversation.isFirstTimeChat, '消息数:', this.messages.length)
-
         this.loading = false
+        this.checkIfPinned() // 检查是否已固定
         this.scrollToBottom()
       } catch (err: any) {
-        console.error('初始化失败:', err)
         wx.showToast({ title: err.message || '初始化失败', icon: 'none' })
         this.loading = false
       }
@@ -163,7 +167,6 @@ createPage({
         this.loading = false
         this.scrollToBottom()
       } catch (err: any) {
-        console.error('加载对话失败:', err)
         wx.showToast({ title: err.message || '加载失败', icon: 'none' })
       }
     },
@@ -200,11 +203,10 @@ createPage({
 
         this.scrollToBottom()
       } catch (err: any) {
-        console.error('发送消息失败:', err)
         wx.showToast({ title: err.message || '发送失败', icon: 'none' })
-        
+
         // 可选: 发送失败时，可以考虑移除刚才添加的用户消息或标记为失败
-        // this.messages.pop() 
+        // this.messages.pop()
       } finally {
         this.sending = false
       }
@@ -214,6 +216,60 @@ createPage({
       this.$nextTick(() => {
         this.scrollToView = 'scroll-bottom'
       })
+    },
+
+    /**
+     * 检查当前对话是否已固定到首页
+     */
+    checkIfPinned() {
+      try {
+        const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
+        if (cached && cached.conversationId === this.conversationId) {
+          this.isPinned = true
+        } else {
+          this.isPinned = false
+        }
+      } catch (e) {
+        this.isPinned = false
+      }
+    },
+
+    /**
+     * 固定/取消固定到首页
+     */
+    handlePinToHome() {
+      if (!this.character || !this.conversationId) {
+        wx.showToast({ title: '角色信息加载中...', icon: 'none' })
+        return
+      }
+
+      try {
+        if (this.isPinned) {
+          // 取消固定
+          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+          this.isPinned = false
+          wx.showToast({ title: '已取消固定', icon: 'success' })
+        } else {
+          // 固定到首页
+          const cacheData = {
+            characterId: this.characterId,
+            conversationId: this.conversationId,
+            character: {
+              id: this.character.id,
+              name: this.character.name,
+              avatarUrl: this.character.avatarUrl,
+              description: this.character.description
+            },
+            timestamp: Date.now()
+          }
+
+          wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
+          this.isPinned = true
+          wx.showToast({ title: '已固定到首页', icon: 'success' })
+        }
+      } catch (e: any) {
+        wx.showToast({ title: e.message || '操作失败', icon: 'none' })
+      }
     }
   }
 })
@@ -255,6 +311,28 @@ createPage({
       background #f5f5f5
       border-radius 36rpx
       font-size 28rpx
+
+    .pin-btn
+      margin-left 16rpx
+      width 72rpx
+      height 72rpx
+      background rgba(255, 215, 0, 0.1)
+      color #ccc
+      border-radius 36rpx
+      font-size 40rpx
+      border none
+      display flex
+      align-items center
+      justify-content center
+      padding 0
+      transition all 0.2s
+
+      &.pinned
+        background rgba(255, 215, 0, 0.2)
+        color #FFD700
+
+      &:active
+        transform scale(0.95)
 
     .send-btn
       margin-left 16rpx

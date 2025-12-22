@@ -29,8 +29,10 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
     header['Authorization'] = `Bearer ${TEST_TOKEN}`
   }
 
+  const fullUrl = `${API_BASE_URL}${url}`
+
   return mpx.request({
-    url: `${API_BASE_URL}${url}`,
+    url: fullUrl,
     method,
     data,
     header: {
@@ -48,10 +50,12 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
       }
       return responseData
     } else {
-      throw new Error(res.data?.message || '请求失败')
+      const errorMsg = res.data?.message || '请求失败'
+      throw new Error(errorMsg)
     }
   }).catch((err: any) => {
-    throw new Error(err.errMsg || err.message || '网络请求失败')
+    const errorMsg = err.errMsg || err.message || '网络请求失败'
+    throw new Error(errorMsg)
   })
 }
 

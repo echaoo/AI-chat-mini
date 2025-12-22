@@ -2,7 +2,7 @@
   <view class="container">
     <view class="content-wrapper">
       <view class="text-card">
-        <view class="card-corner-tab">祁煜</view>
+        <view class="card-corner-tab">{{characterName}}</view>
         <text class="card-text">{{greetingText}}</text>
       </view>
       <view class="button-group">
@@ -35,11 +35,15 @@ import { conversationApi } from '../common/api'
 const GREETING_CACHE_KEY = 'greeting_cache'
 const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours
 const CONVERSATION_CACHE_KEY = 'last_conversation_id'
+const HOME_CHARACTER_CACHE_KEY = 'home_character' // 首页固定角色缓存
 const GREETING_COMMAND = '[GET_GREETING]'
 
 createPage({
   data: {
-    greetingText: '你好' // Provide a default value
+    greetingText: '你好', // Provide a default value
+    characterName: '祁煜', // 默认角色名称
+    characterId: 4, // 默认角色 ID
+    conversationId: null as number | null // 缓存的对话 ID
   },
 
   // 用于取消预取任务的标记
@@ -47,6 +51,7 @@ createPage({
 
   onLoad() {
     this._isUnloaded = false
+    this.loadHomeCharacter() // 加载固定的角色信息
     this.updateAndDisplayGreeting()
   },
 
@@ -56,6 +61,23 @@ createPage({
   },
 
   methods: {
+    /**
+     * @description 加载固定到首页的角色信息
+     */
+    loadHomeCharacter() {
+      try {
+        const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
+        if (cached && cached.character) {
+          // 使用缓存的角色信息
+          this.characterName = cached.character.name || '祁煜'
+          this.characterId = cached.characterId || 4
+          this.conversationId = cached.conversationId || null
+        }
+      } catch (e) {
+        // 忽略错误，使用默认值
+      }
+    },
+
     /**
      * @description 更新并显示问候语
      * 1. 优先从缓存读取，若有效且未使用过，则显示并标记为已使用
@@ -70,15 +92,13 @@ createPage({
         // 检查缓存是否存在、未过期、且未使用过
         if (cached && !cached.used && now - cached.timestamp < GREETING_CACHE_DURATION_MS) {
           this.greetingText = cached.text
-          console.log('使用了缓存的问候语')
 
           // 标记为已使用
           cached.used = true
           wx.setStorageSync(GREETING_CACHE_KEY, cached)
         } else {
           // 缓存无效或已使用，从静态库随机取一个（传入角色标识）
-          this.greetingText = getGreeting('qiyu') // TODO: 动态获取当前角色
-          console.log('使用了静态的问候语')
+          this.greetingText = getGreeting('qiyu') // 使用角色标识获取问候语
         }
       } catch (e) {
         // 如果读取缓存失败，同样使用静态文案
@@ -98,23 +118,22 @@ createPage({
       setTimeout(async () => {
         // 检查页面是否已卸载
         if (this._isUnloaded) {
-          console.log('页面已卸载，取消预取问候语')
           return
         }
 
-        console.log('后台开始预取新的问候语...')
+        // 优先使用固定角色的 conversationId，否则从缓存读取
+        let conversationId: number | null = this.conversationId
 
-        // 从缓存获取 conversationId
-        let conversationId: number | null = null
-        try {
-          conversationId = wx.getStorageSync(CONVERSATION_CACHE_KEY)
-        } catch (e) {
-          console.log('读取 conversationId 缓存失败')
+        if (!conversationId) {
+          try {
+            conversationId = wx.getStorageSync(CONVERSATION_CACHE_KEY)
+          } catch (e) {
+            // 忽略错误
+          }
         }
 
         // 如果没有 conversationId，降级使用静态文案
         if (!conversationId) {
-          console.log('无 conversationId，使用静态问候语')
           const newGreeting = getGreeting('qiyu')
           this.saveGreetingToCache(newGreeting)
           return
@@ -131,12 +150,10 @@ createPage({
 
           if (newGreeting) {
             this.saveGreetingToCache(newGreeting)
-            console.log('API 问候语已缓存:', newGreeting)
           }
         } catch (error: any) {
           if (this._isUnloaded) return
 
-          console.error('获取问候语失败，降级使用静态文案:', error.message)
           // API 调用失败，降级使用静态文案
           const fallbackGreeting = getGreeting('qiyu')
           this.saveGreetingToCache(fallbackGreeting)
@@ -159,20 +176,20 @@ createPage({
 
       wx.setStorage({
         key: GREETING_CACHE_KEY,
-        data: newCache,
-        success: () => {
-          console.log('问候语已缓存:', text)
-        }
+        data: newCache
       })
     },
 
     navigateToChat() {
-      // 优先使用缓存的 conversationId（复用已有对话）
-      let conversationId: number | null = null
-      try {
-        conversationId = wx.getStorageSync(CONVERSATION_CACHE_KEY)
-      } catch (e) {
-        console.log('读取 conversationId 缓存失败')
+      // 优先使用固定角色的 conversationId，否则使用最后一次对话的 conversationId
+      let conversationId: number | null = this.conversationId
+
+      if (!conversationId) {
+        try {
+          conversationId = wx.getStorageSync(CONVERSATION_CACHE_KEY)
+        } catch (e) {
+          // 忽略错误
+        }
       }
 
       if (conversationId) {
@@ -181,10 +198,9 @@ createPage({
           url: `/pages/chat?conversationId=${conversationId}`
         })
       } else {
-        // 没有缓存，创建新对话
-        const characterId = 4 // TODO: 动态获取当前角色 ID
+        // 没有缓存，使用当前角色创建新对话
         wx.navigateTo({
-          url: `/pages/chat?characterId=${characterId}`
+          url: `/pages/chat?characterId=${this.characterId}`
         })
       }
     },
