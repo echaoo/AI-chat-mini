@@ -1,0 +1,281 @@
+<template>
+  <!-- 内容卡片 -->
+  <view class="content-card">
+    <!-- 角色介绍（仅首次聊天显示） -->
+    <view class="intro-section" wx:if="{{!character.hasChatHistory && character.description}}">
+      <text class="intro-label">介绍：</text>
+      <text class="intro-text">{{character.description}}</text>
+    </view>
+
+    <!-- 问候语消息 -->
+    <view class="greeting-message">
+      <text class="message-text">{{character.greetingMessage || '你好~'}}</text>
+    </view>
+
+    <!-- 角色信息和工具栏 -->
+    <view class="info-toolbar">
+      <!-- 左侧：角色和作者信息 -->
+      <view class="character-meta">
+        <text class="meta-name">{{character.name}}</text>
+        <text class="meta-author">{{character.isOfficial ? '官方' : '用户创建'}}</text>
+      </view>
+
+      <!-- 右侧：工具按钮 -->
+      <view class="action-tools">
+        <!-- 点赞 -->
+        <view class="tool-item" bindtap="handleLike">
+          <text class="tool-icon">👍</text>
+          <text class="tool-count">{{character.likeCount || 0}}</text>
+        </view>
+
+        <!-- 历史消息 -->
+        <view class="tool-item" bindtap="handleViewHistory">
+          <text class="tool-icon">💬</text>
+          <text class="tool-count">{{character.messageCount || 0}}</text>
+        </view>
+
+        <!-- 收藏 -->
+        <view
+          class="tool-item favorite-tool {{character.isFavorite ? 'active' : ''}}"
+          bindtap="handleToggleFavorite"
+        >
+          <text class="tool-icon">{{character.isFavorite ? '❤️' : '🤍'}}</text>
+        </view>
+
+        <!-- 固定到首页 -->
+        <view
+          class="tool-item pin-tool {{character.isPinned ? 'active' : ''}}"
+          bindtap="handlePinToHome"
+        >
+          <text class="tool-icon">{{character.isPinned ? '★' : '☆'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 输入框 -->
+    <view class="input-section">
+      <input
+        class="chat-input"
+        type="text"
+        placeholder="输入消息开始聊天..."
+        value="{{inputText}}"
+        bindinput="handleInput"
+        bindconfirm="handleSendMessage"
+        confirm-type="send"
+      />
+      <button
+        class="send-btn {{inputText ? 'active' : ''}}"
+        bindtap="handleSendMessage"
+        disabled="{{!inputText}}"
+      >
+        发送
+      </button>
+    </view>
+  </view>
+</template>
+
+<script lang="ts">
+import { createComponent } from '@mpxjs/core'
+import type { Character } from '../common/types'
+
+createComponent({
+  properties: {
+    // 角色数据
+    character: {
+      type: Object as () => Character,
+      value: null
+    },
+    // 输入框文本
+    inputText: {
+      type: String,
+      value: ''
+    }
+  },
+
+  methods: {
+    // 点赞
+    handleLike() {
+      this.triggerEvent('like', { characterId: this.character.id })
+    },
+
+    // 查看历史消息
+    handleViewHistory() {
+      this.triggerEvent('viewHistory', { characterId: this.character.id })
+    },
+
+    // 切换收藏
+    handleToggleFavorite() {
+      this.triggerEvent('toggleFavorite', { characterId: this.character.id })
+    },
+
+    // 固定到首页
+    handlePinToHome() {
+      this.triggerEvent('pinToHome', { character: this.character })
+    },
+
+    // 输入框内容变化
+    handleInput(e: any) {
+      this.triggerEvent('input', { value: e.detail.value })
+    },
+
+    // 发送消息
+    handleSendMessage() {
+      if (this.inputText && this.inputText.trim()) {
+        this.triggerEvent('sendMessage', {
+          character: this.character,
+          message: this.inputText.trim()
+        })
+      }
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+// 内容卡片
+.content-card
+  position relative
+  z-index 3
+  width 100%
+  padding 0 32rpx
+  margin-bottom 40rpx
+
+  // 介绍部分
+  .intro-section
+    background rgba(255, 255, 255, 0.12)
+    backdrop-filter blur(20rpx)
+    border-radius 20rpx
+    padding 24rpx 28rpx
+    margin-bottom 20rpx
+    border 1rpx solid rgba(255, 255, 255, 0.15)
+
+    .intro-label
+      font-size 26rpx
+      color rgba(255, 255, 255, 0.7)
+      font-weight 500
+      margin-right 8rpx
+
+    .intro-text
+      font-size 26rpx
+      color rgba(255, 255, 255, 0.95)
+      line-height 1.6
+
+  // 问候语消息
+  .greeting-message
+    width 80%
+    color rgba(255, 255, 255, 0.95)
+    background-color rgba(255, 255, 255, 0.6)
+    backdrop-filter blur(20rpx)
+    border-radius 20rpx
+    padding 28rpx
+    margin-bottom 60rpx
+    border 1rpx solid rgba(255, 255, 255, 0.15)
+
+    .message-text
+      font-size 30rpx
+      color #333
+      line-height 1.6
+      display block
+
+  // 信息和工具栏
+  .info-toolbar
+    display flex
+    justify-content space-between
+    align-items center
+    margin-bottom 20rpx
+    padding 0 8rpx
+
+    .character-meta
+      display flex
+      flex-direction column
+      gap 8rpx
+
+      .meta-name
+        font-size 32rpx
+        font-weight 700
+        color #fff
+        text-shadow 0 2px 8px rgba(0,0,0,0.3)
+
+      .meta-author
+        font-size 24rpx
+        color rgba(255, 255, 255, 0.7)
+
+    .action-tools
+      display flex
+      align-items center
+      gap 24rpx
+
+      .tool-item
+        display flex
+        flex-direction column
+        align-items center
+        gap 2rpx
+        transition all 0.2s
+
+        &:active
+          transform scale(0.95)
+
+        .tool-icon
+          font-size 32rpx
+
+        .tool-count
+          font-size 20rpx
+          color rgba(255, 255, 255, 0.8)
+
+        &.favorite-tool.active
+          background rgba(255, 100, 100, 0.25)
+          border-color rgba(255, 100, 100, 0.4)
+
+        &.pin-tool.active
+          background rgba(255, 215, 0, 0.25)
+          border-color rgba(255, 215, 0, 0.4)
+
+  // 输入框部分
+  .input-section
+    display flex
+    align-items center
+    gap 16rpx
+    background rgba(255, 255, 255, 0.12)
+    backdrop-filter blur(20rpx)
+    border-radius 16rpx
+    padding 12rpx 16rpx
+    border 1rpx solid rgba(255, 255, 255, 0.15)
+
+    .chat-input
+      flex 1
+      height 64rpx
+      background transparent
+      border none
+      font-size 28rpx
+      color #fff
+      padding 0 16rpx
+
+      &::placeholder
+        color rgba(255, 255, 255, 0.5)
+
+    .send-btn
+      height 64rpx
+      padding 0 32rpx
+      background rgba(255, 255, 255, 0.15)
+      color rgba(255, 255, 255, 0.6)
+      border-radius 32rpx
+      font-size 28rpx
+      border none
+      transition all 0.2s
+
+      &.active
+        background linear-gradient(135deg, #667eea, #764ba2)
+        color #fff
+
+      &:active
+        transform scale(0.98)
+
+      &[disabled]
+        opacity 0.5
+</style>
+
+<script type="application/json">
+{
+  "component": true
+}
+</script>
