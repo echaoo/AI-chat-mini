@@ -1,16 +1,44 @@
 <template>
   <!-- 内容卡片 -->
   <view class="content-card">
-    <!-- 角色介绍（仅首次聊天显示） -->
-    <view class="intro-section" wx:if="{{!character.hasChatHistory && character.description}}">
-      <text class="intro-label">介绍：</text>
-      <text class="intro-text">{{character.description}}</text>
+    <!-- 初始状态：显示角色介绍和问候语 -->
+    <view wx:if="{{!hasStartedChat}}">
+      <!-- 角色介绍（仅首次聊天显示） -->
+      <view class="intro-section" wx:if="{{!character.hasChatHistory && character.description}}">
+        <text class="intro-label">介绍：</text>
+        <text class="intro-text">{{character.description}}</text>
+      </view>
+
+      <!-- 问候语消息 -->
+      <view class="greeting-message">
+        <text class="message-text">{{character.greetingMessage || '你好~'}}</text>
+      </view>
     </view>
 
-    <!-- 问候语消息 -->
-    <view class="greeting-message">
-      <text class="message-text">{{character.greetingMessage || '你好~'}}</text>
-    </view>
+    <!-- 聊天状态：显示消息列表 -->
+    <scroll-view
+      wx:else
+      scroll-y
+      class="message-list"
+      scroll-into-view="{{scrollToView}}"
+      scroll-with-animation
+    >
+      <view wx:if="{{loading}}" class="loading">
+        <text>加载中...</text>
+      </view>
+
+      <view wx:else>
+        <message-bubble
+          wx:for="{{messages}}"
+          wx:key="id"
+          id="msg-{{item.id}}"
+          message="{{item}}"
+        />
+      </view>
+
+      <!-- 滚动锚点 -->
+      <view id="scroll-bottom" class="scroll-anchor"></view>
+    </scroll-view>
 
     <!-- 角色信息和工具栏 -->
     <view class="info-toolbar">
@@ -44,10 +72,10 @@
 
         <!-- 固定到首页 -->
         <view
-          class="tool-item pin-tool {{character.isPinned ? 'active' : ''}}"
+          class="tool-item pin-tool {{isPinned ? 'active' : ''}}"
           bindtap="handlePinToHome"
         >
-          <text class="tool-icon">{{character.isPinned ? '★' : '☆'}}</text>
+          <text class="tool-icon">{{isPinned ? '★' : '☆'}}</text>
         </view>
       </view>
     </view>
@@ -60,15 +88,16 @@
         placeholder="输入消息开始聊天..."
         value="{{inputText}}"
         bindinput="handleInput"
-        bindconfirm="handleSendMessage"
+        bindconfirm="handleSend"
         confirm-type="send"
+        disabled="{{sending}}"
       />
       <button
         class="send-btn {{inputText ? 'active' : ''}}"
-        bindtap="handleSendMessage"
-        disabled="{{!inputText}}"
+        bindtap="handleSend"
+        disabled="{{sending || !inputText}}"
       >
-        发送
+        {{sending ? '发送中' : '发送'}}
       </button>
     </view>
   </view>
@@ -76,7 +105,12 @@
 
 <script lang="ts">
 import { createComponent } from '@mpxjs/core'
-import type { Character } from '../common/types'
+import { characterApi, conversationApi } from '../common/api'
+import type { Character, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
+
+const GREETING_CACHE_KEY = 'greeting_cache'
+const CONVERSATION_CACHE_KEY = 'last_conversation_id'
+const HOME_CHARACTER_CACHE_KEY = 'home_character'
 
 createComponent({
   properties: {
@@ -84,15 +118,230 @@ createComponent({
     character: {
       type: Object as () => Character,
       value: null
+    } as any,
+    // 对话ID（如果是从历史进入）
+    initialConversationId: {
+      type: Number,
+      value: 0
     },
-    // 输入框文本
-    inputText: {
+    // 初始消息（如果需要自动发送）
+    initialMessage: {
       type: String,
       value: ''
     }
   },
 
+  data: {
+    conversationId: 0,
+    messages: [] as Message[],
+    inputText: '',
+    loading: false,
+    sending: false,
+    scrollToView: '',
+    isPinned: false,
+    hasStartedChat: false // 是否已开始聊天
+  },
+
+  lifetimes: {
+    attached() {
+      this.init()
+    },
+
+    detached() {
+      // 组件卸载时，清除问候语缓存
+      try {
+        wx.removeStorageSync(GREETING_CACHE_KEY)
+      } catch (e) {
+        // 忽略错误
+      }
+
+      // 缓存当前 conversationId
+      if (this.conversationId) {
+        try {
+          wx.setStorageSync(CONVERSATION_CACHE_KEY, this.conversationId)
+        } catch (e) {
+          // 忽略错误
+        }
+      }
+    }
+  },
+
   methods: {
+    // 初始化
+    async init() {
+      if (this.initialConversationId) {
+        // 如果有 conversationId，加载已有对话
+        this.conversationId = this.initialConversationId
+        await this.loadExistingConversation()
+
+        // 如果有初始消息，在加载完成后自动发送
+        if (this.initialMessage) {
+          setTimeout(() => {
+            this.inputText = this.initialMessage
+            this.handleSend()
+          }, 500)
+        }
+      } else if (this.character?.id) {
+        // 否则创建新对话
+        await this.createNewConversation()
+      }
+
+      this.checkIfPinned()
+    },
+
+    // 创建新对话
+    async createNewConversation() {
+      try {
+        this.loading = true
+
+        // 创建对话（后端会返回消息列表）
+        const conversation: CreateConversationResponse = await conversationApi.createConversation(this.character.id)
+        this.conversationId = conversation.id
+
+        // 使用后端返回的消息列表
+        if (conversation.messages && conversation.messages.length > 0) {
+          this.messages = conversation.messages.map((msg: any) => ({
+            id: msg.id,
+            conversationId: this.conversationId,
+            role: msg.role,
+            content: msg.content,
+            tokens: null,
+            createdAt: msg.createdAt
+          }))
+          this.hasStartedChat = true
+        }
+
+        this.loading = false
+        this.scrollToBottom()
+      } catch (err: any) {
+        wx.showToast({ title: err.message || '初始化失败', icon: 'none' })
+        this.loading = false
+      }
+    },
+
+    // 加载已有对话
+    async loadExistingConversation() {
+      try {
+        this.loading = true
+
+        // 加载对话信息和消息历史
+        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId)
+
+        // 保存消息列表
+        this.messages = response.messages || []
+        this.hasStartedChat = this.messages.length > 0
+
+        this.loading = false
+        this.scrollToBottom()
+      } catch (err: any) {
+        wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+        this.loading = false
+      }
+    },
+
+    // 输入框内容变化
+    handleInput(e: any) {
+      this.inputText = e.detail.value
+    },
+
+    // 发送消息
+    async handleSend() {
+      const content = this.inputText.trim()
+      if (!content || this.sending) return
+
+      // 如果还没开始聊天，先创建对话
+      if (!this.hasStartedChat) {
+        await this.createNewConversation()
+      }
+
+      // 1. 创建并立即显示用户消息
+      const userMessage: Message = {
+        id: Date.now(),
+        conversationId: this.conversationId,
+        role: 'user',
+        content: content,
+        tokens: null,
+        createdAt: new Date().toISOString()
+      }
+
+      this.messages = [...this.messages, userMessage]
+      this.inputText = ''
+      this.sending = true
+      this.hasStartedChat = true
+      this.scrollToBottom()
+
+      try {
+        // 2. 发送消息到后端，并接收助手消息
+        const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
+
+        // 3. 将助手消息添加到列表
+        this.messages = [...this.messages, response.assistantMessage]
+
+        this.scrollToBottom()
+      } catch (err: any) {
+        wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+      } finally {
+        this.sending = false
+      }
+    },
+
+    // 滚动到底部
+    scrollToBottom() {
+      this.$nextTick(() => {
+        this.scrollToView = 'scroll-bottom'
+      })
+    },
+
+    // 检查是否已固定到首页
+    checkIfPinned() {
+      try {
+        const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
+        if (cached && cached.conversationId === this.conversationId) {
+          this.isPinned = true
+        } else {
+          this.isPinned = false
+        }
+      } catch (e) {
+        this.isPinned = false
+      }
+    },
+
+    // 固定/取消固定到首页
+    handlePinToHome() {
+      if (!this.character || !this.conversationId) {
+        wx.showToast({ title: '角色信息加载中...', icon: 'none' })
+        return
+      }
+
+      try {
+        if (this.isPinned) {
+          // 取消固定
+          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+          this.isPinned = false
+          wx.showToast({ title: '已取消固定', icon: 'success' })
+        } else {
+          // 固定到首页
+          const cacheData = {
+            characterId: this.character.id,
+            conversationId: this.conversationId,
+            character: {
+              id: this.character.id,
+              name: this.character.name,
+              avatarUrl: this.character.avatarUrl,
+              description: this.character.description
+            },
+            timestamp: Date.now()
+          }
+
+          wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
+          this.isPinned = true
+          wx.showToast({ title: '已固定到首页', icon: 'success' })
+        }
+      } catch (e: any) {
+        wx.showToast({ title: e.message || '操作失败', icon: 'none' })
+      }
+    },
+
     // 点赞
     handleLike() {
       this.triggerEvent('like', { characterId: this.character.id })
@@ -106,26 +355,6 @@ createComponent({
     // 切换收藏
     handleToggleFavorite() {
       this.triggerEvent('toggleFavorite', { characterId: this.character.id })
-    },
-
-    // 固定到首页
-    handlePinToHome() {
-      this.triggerEvent('pinToHome', { character: this.character })
-    },
-
-    // 输入框内容变化
-    handleInput(e: any) {
-      this.triggerEvent('input', { value: e.detail.value })
-    },
-
-    // 发送消息
-    handleSendMessage() {
-      if (this.inputText && this.inputText.trim()) {
-        this.triggerEvent('sendMessage', {
-          character: this.character,
-          message: this.inputText.trim()
-        })
-      }
     }
   }
 })
@@ -176,6 +405,22 @@ createComponent({
       color #333
       line-height 1.6
       display block
+
+  // 消息列表
+  .message-list
+    height 400rpx
+    padding 32rpx 0
+    margin-bottom 20rpx
+    overflow-y auto
+
+    .loading
+      text-align center
+      padding 100rpx 0
+      color rgba(255, 255, 255, 0.7)
+      font-size 28rpx
+
+    .scroll-anchor
+      height 1rpx
 
   // 信息和工具栏
   .info-toolbar
@@ -276,6 +521,9 @@ createComponent({
 
 <script type="application/json">
 {
-  "component": true
+  "component": true,
+  "usingComponents": {
+    "message-bubble": "./message-bubble"
+  }
 }
 </script>
