@@ -19,6 +19,9 @@ export interface Character {
   hasChatHistory?: boolean
   messageCount?: number
   likeCount?: number
+  // 用户与角色的关系字段（需要认证）
+  isFavorite?: boolean
+  isPinnedToHome?: boolean
 }
 
 // 创建角色请求

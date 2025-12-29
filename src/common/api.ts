@@ -36,6 +36,42 @@ export const characterApi = {
    */
   createCharacter(data: CreateCharacterRequest): Promise<Character> {
     return post<Character>('/companion/characters', data)
+  },
+
+  /**
+   * 获取固定到首页的角色
+   */
+  async getPinnedCharacter(): Promise<{
+    characterId: number
+    name: string
+    avatarUrl: string
+    description: string
+    greetingMessage: string
+    conversationId: number | null
+  } | null> {
+    return get('/companion/characters/pinned/home')
+  },
+
+  /**
+   * 获取收藏角色列表
+   */
+  async getFavoriteCharacters(): Promise<Character[]> {
+    const result = await get<{ list: Character[] }>('/companion/characters/favorites/list')
+    return result?.list || []
+  },
+
+  /**
+   * 收藏/取消收藏角色
+   */
+  toggleFavorite(characterId: number): Promise<{ characterId: number; isFavorite: boolean }> {
+    return post(`/companion/characters/${characterId}/favorite`, {})
+  },
+
+  /**
+   * 固定/取消固定角色到首页
+   */
+  togglePinToHome(characterId: number): Promise<{ characterId: number; isPinnedToHome: boolean }> {
+    return post(`/companion/characters/${characterId}/pin-to-home`, {})
   }
 }
 
@@ -77,5 +113,19 @@ export const conversationApi = {
    */
   deleteConversation(conversationId: number): Promise<void> {
     return del<void>(`/companion/conversations/${conversationId}`)
+  },
+
+  /**
+   * 更新对话记忆摘要
+   * 建议在用户离开聊天页面时调用
+   */
+  updateMemorySummary(conversationId: number): Promise<{
+    success: boolean
+    updated: boolean
+    message?: string
+    messagesProcessed?: number
+    memorySummary?: string
+  }> {
+    return post(`/companion/conversations/${conversationId}/memory`, {})
   }
 }

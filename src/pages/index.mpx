@@ -30,7 +30,7 @@
 <script lang="ts">
 import { createPage } from '@mpxjs/core'
 import { getGreeting } from '../common/greetings'
-import { conversationApi } from '../common/api'
+import { conversationApi, characterApi } from '../common/api'
 
 const GREETING_CACHE_KEY = 'greeting_cache'
 const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours
@@ -51,7 +51,11 @@ createPage({
 
   onLoad() {
     this._isUnloaded = false
-    this.loadHomeCharacter() // 加载固定的角色信息
+  },
+
+  onShow() {
+    // 每次显示页面时加载角色信息
+    this.loadHomeCharacter()
     this.updateAndDisplayGreeting()
   },
 
@@ -63,18 +67,72 @@ createPage({
   methods: {
     /**
      * @description 加载固定到首页的角色信息
+     * 1. 先从缓存读取，立即显示（快速响应）
+     * 2. 调用接口获取最新数据
+     * 3. 对比 characterId，如果不同则更新缓存和 UI
+     * 4. 如果接口返回 null（无固定角色），清空缓存并使用默认值
      */
     loadHomeCharacter() {
+      // 1. 先从缓存读取，立即显示
       try {
         const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
         if (cached && cached.character) {
-          // 使用缓存的角色信息
           this.characterName = cached.character.name || '祁煜'
           this.characterId = cached.characterId || 4
           this.conversationId = cached.conversationId || null
         }
       } catch (e) {
         // 忽略错误，使用默认值
+      }
+
+      // 2. 后台调用接口获取最新数据
+      this.syncHomeCharacterFromServer()
+    },
+
+    /**
+     * @description 从服务器同步首页角色数据
+     */
+    async syncHomeCharacterFromServer() {
+      try {
+        const serverData = await characterApi.getPinnedCharacter()
+
+        // 页面已卸载时不执行
+        if (this._isUnloaded) return
+
+        if (serverData) {
+          // 3. 对比 characterId，如果不同则更新
+          if (serverData.characterId !== this.characterId) {
+            this.characterName = serverData.name
+            this.characterId = serverData.characterId
+            this.conversationId = serverData.conversationId
+          } else if (serverData.conversationId !== this.conversationId) {
+            // characterId 相同但 conversationId 不同，也更新
+            this.conversationId = serverData.conversationId
+          }
+
+          // 更新缓存
+          const cacheData = {
+            characterId: serverData.characterId,
+            conversationId: serverData.conversationId,
+            character: {
+              id: serverData.characterId,
+              name: serverData.name,
+              avatarUrl: serverData.avatarUrl,
+              description: serverData.description
+            },
+            timestamp: Date.now()
+          }
+          wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
+        } else {
+          // 4. 接口返回 null，清空缓存并使用默认值
+          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+          this.characterName = '祁煜'
+          this.characterId = 4
+          this.conversationId = null
+        }
+      } catch (e) {
+        // 接口调用失败，保持当前缓存数据不变
+        console.warn('[Home] 同步首页角色失败:', e)
       }
     },
 
@@ -181,6 +239,7 @@ createPage({
     },
 
     navigateToChat() {
+      // 跳转到角色卡片选择页面
       // 优先使用固定角色的 conversationId，否则使用最后一次对话的 conversationId
       let conversationId: number | null = this.conversationId
 
@@ -192,17 +251,23 @@ createPage({
         }
       }
 
-      if (conversationId) {
-        // 有缓存的对话，复用
-        wx.navigateTo({
-          url: `/pages/chat?conversationId=${conversationId}`
-        })
-      } else {
-        // 没有缓存，使用当前角色创建新对话
-        wx.navigateTo({
-          url: `/pages/chat?characterId=${this.characterId}`
-        })
+      // 构建 URL 参数
+      let url = '/pages/character-select'
+      const params: string[] = []
+
+      if (this.characterId) {
+        params.push(`characterId=${this.characterId}`)
       }
+
+      if (conversationId) {
+        params.push(`conversationId=${conversationId}`)
+      }
+
+      if (params.length > 0) {
+        url += '?' + params.join('&')
+      }
+
+      wx.navigateTo({ url })
     },
     navigateToCharacterSelect() {
       wx.navigateTo({

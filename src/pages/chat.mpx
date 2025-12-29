@@ -246,16 +246,12 @@ createPage({
     },
 
     /**
-     * 检查当前对话是否已固定到首页
+     * 检查当前对话是否已固定到首页（从本地缓存判断，用于快速显示）
      */
     checkIfPinned() {
       try {
         const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
-        if (cached && cached.conversationId === this.conversationId) {
-          this.isPinned = true
-        } else {
-          this.isPinned = false
-        }
+        this.isPinned = cached && cached.characterId === this.characterId
       } catch (e) {
         this.isPinned = false
       }
@@ -264,23 +260,22 @@ createPage({
     /**
      * 固定/取消固定到首页
      */
-    handlePinToHome() {
-      if (!this.character || !this.conversationId) {
+    async handlePinToHome() {
+      if (!this.character || !this.characterId) {
         wx.showToast({ title: '角色信息加载中...', icon: 'none' })
         return
       }
 
       try {
-        if (this.isPinned) {
-          // 取消固定
-          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
-          this.isPinned = false
-          wx.showToast({ title: '已取消固定', icon: 'success' })
-        } else {
-          // 固定到首页
+        // 调用后端接口
+        const result = await characterApi.togglePinToHome(this.characterId)
+        this.isPinned = result.isPinnedToHome
+
+        if (result.isPinnedToHome) {
+          // 固定成功，更新本地缓存
           const cacheData = {
             characterId: this.characterId,
-            conversationId: this.conversationId,
+            conversationId: this.conversationId || null,
             character: {
               id: this.character.id,
               name: this.character.name,
@@ -289,10 +284,12 @@ createPage({
             },
             timestamp: Date.now()
           }
-
           wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
-          this.isPinned = true
           wx.showToast({ title: '已固定到首页', icon: 'success' })
+        } else {
+          // 取消固定，清空本地缓存
+          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+          wx.showToast({ title: '已取消固定', icon: 'success' })
         }
       } catch (e: any) {
         wx.showToast({ title: e.message || '操作失败', icon: 'none' })

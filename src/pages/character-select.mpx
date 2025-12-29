@@ -27,11 +27,11 @@
         <!-- 角色卡片内容组件 -->
         <character-card-content
           character="{{item}}"
+          initial-conversation-id="{{item.id === targetCharacterId ? targetConversationId : 0}}"
           input-text="{{inputText}}"
           bindlike="handleLike"
           bindviewHistory="handleViewHistory"
           bindtoggleFavorite="handleToggleFavorite"
-          bindpinToHome="handlePinToHome"
           bindinput="handleInput"
           bindsendMessage="handleSendMessage"
         />
@@ -62,22 +62,26 @@ import { characterApi, conversationApi } from '../common/api'
 import type { Character } from '../common/types'
 
 const FAVORITE_CHARACTERS_KEY = 'favorite_characters'
-const HOME_CHARACTER_CACHE_KEY = 'home_character'
 
 createPage({
   data: {
     characters: [] as Character[],
     currentIndex: 0,
     showHint: true,
-    favoriteIds: [] as number[],
-    favoriteCount: 0,
     inputText: '',
-    pinnedCharacterId: null as number | null
+    targetCharacterId: null as number | null, // 目标角色ID（用于定位）
+    targetConversationId: null as number | null // 目标对话ID
   },
 
-  onLoad() {
-    this.loadFavorites()
-    this.loadPinnedCharacter()
+  onLoad(options: any) {
+    // 接收 URL 参数
+    if (options.characterId) {
+      this.targetCharacterId = parseInt(options.characterId)
+    }
+    if (options.conversationId) {
+      this.targetConversationId = parseInt(options.conversationId)
+    }
+
     this.loadCharacters()
 
     // 3秒后隐藏提示
@@ -89,6 +93,13 @@ createPage({
   methods: {
     // 加载角色列表
     async loadCharacters() {
+      // 清空本地收藏缓存，以后端数据为准
+      try {
+        wx.removeStorageSync(FAVORITE_CHARACTERS_KEY)
+      } catch (e) {
+        // 忽略错误
+      }
+
       try {
         const [myChars, officialChars] = await Promise.all([
           characterApi.getMyCharacters().catch(() => []),
@@ -96,103 +107,74 @@ createPage({
         ])
 
         // 合并角色列表，官方角色在前
-        const allCharacters = [...officialChars, ...myChars]
+        // 后端已返回 isFavorite 和 isPinnedToHome
+        this.characters = [...officialChars, ...myChars]
 
-        // 添加前端状态（收藏、固定）
-        this.characters = allCharacters.map(char => ({
-          ...char,
-          isFavorite: this.favoriteIds.includes(char.id),
-          isPinned: this.pinnedCharacterId === char.id
-          // hasChatHistory, messageCount, likeCount 由后端返回
-        }))
+        // 如果有目标角色，定位到该角色
+        if (this.targetCharacterId) {
+          const targetIndex = this.characters.findIndex(char => char.id === this.targetCharacterId)
+          if (targetIndex !== -1) {
+            this.currentIndex = targetIndex
+          }
+        }
       } catch (err: any) {
         wx.showToast({ title: '加载角色失败', icon: 'none' })
       }
     },
 
-    // 加载收藏列表
-    loadFavorites() {
-      try {
-        const favorites = wx.getStorageSync(FAVORITE_CHARACTERS_KEY) || []
-        this.favoriteIds = favorites
-        this.favoriteCount = favorites.length
-      } catch (e) {
-        this.favoriteIds = []
-        this.favoriteCount = 0
-      }
-    },
-
-    // 加载固定到首页的角色
-    loadPinnedCharacter() {
-      try {
-        const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
-        if (cached && cached.characterId) {
-          this.pinnedCharacterId = cached.characterId
-        }
-      } catch (e) {
-        this.pinnedCharacterId = null
-      }
-    },
-
-    // 切换收藏
-    handleToggleFavorite(e: any) {
+    // 切换收藏（乐观更新 + 后端同步）
+    async handleToggleFavorite(e: any) {
       const characterId = e.detail.characterId
-      const index = this.favoriteIds.indexOf(characterId)
+      const charIndex = this.characters.findIndex(c => c.id === characterId)
+      if (charIndex === -1) return
 
-      if (index > -1) {
-        // 取消收藏
-        this.favoriteIds.splice(index, 1)
-        wx.showToast({ title: '已取消收藏', icon: 'none' })
-      } else {
-        // 添加收藏
-        this.favoriteIds.push(characterId)
-        wx.showToast({ title: '已加入收藏', icon: 'success' })
-      }
+      const oldValue = this.characters[charIndex].isFavorite
+      const newValue = !oldValue
 
-      // 保存到本地
-      wx.setStorageSync(FAVORITE_CHARACTERS_KEY, this.favoriteIds)
-      this.favoriteCount = this.favoriteIds.length
+      // 1. 乐观更新 UI
+      this.characters[charIndex].isFavorite = newValue
+      this.characters = [...this.characters] // 触发响应式更新
 
-      // 更新当前角色的收藏状态
-      this.characters = this.characters.map(char => ({
-        ...char,
-        isFavorite: this.favoriteIds.includes(char.id)
-      }))
-    },
-
-    // 固定到首页
-    handlePinToHome(e: any) {
-      const character = e.detail.character
-
-      if (this.pinnedCharacterId === character.id) {
-        // 取消固定
-        wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
-        this.pinnedCharacterId = null
-        wx.showToast({ title: '已取消固定', icon: 'success' })
-      } else {
-        // 固定到首页
-        const cacheData = {
-          characterId: character.id,
-          conversationId: null, // 创建对话后会更新
-          character: {
-            id: character.id,
-            name: character.name,
-            avatarUrl: character.avatarUrl,
-            description: character.description
-          },
-          timestamp: Date.now()
+      // 2. 更新本地缓存
+      try {
+        const favoriteIds: number[] = wx.getStorageSync(FAVORITE_CHARACTERS_KEY) || []
+        if (newValue) {
+          if (!favoriteIds.includes(characterId)) {
+            favoriteIds.push(characterId)
+          }
+        } else {
+          const idx = favoriteIds.indexOf(characterId)
+          if (idx > -1) favoriteIds.splice(idx, 1)
         }
-
-        wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
-        this.pinnedCharacterId = character.id
-        wx.showToast({ title: '已固定到首页', icon: 'success' })
+        wx.setStorageSync(FAVORITE_CHARACTERS_KEY, favoriteIds)
+      } catch (e) {
+        // 忽略缓存错误
       }
 
-      // 更新状态
-      this.characters = this.characters.map(char => ({
-        ...char,
-        isPinned: this.pinnedCharacterId === char.id
-      }))
+      // 3. 调用后端接口
+      try {
+        await characterApi.toggleFavorite(characterId)
+        wx.showToast({ title: newValue ? '已加入收藏' : '已取消收藏', icon: 'none' })
+      } catch (err: any) {
+        // 4. 失败则回滚
+        this.characters[charIndex].isFavorite = oldValue
+        this.characters = [...this.characters]
+        wx.showToast({ title: err.message || '操作失败', icon: 'none' })
+
+        // 回滚本地缓存
+        try {
+          const favoriteIds: number[] = wx.getStorageSync(FAVORITE_CHARACTERS_KEY) || []
+          if (oldValue) {
+            if (!favoriteIds.includes(characterId)) favoriteIds.push(characterId)
+          } else {
+            const idx = favoriteIds.indexOf(characterId)
+            if (idx > -1) favoriteIds.splice(idx, 1)
+          }
+          wx.setStorageSync(FAVORITE_CHARACTERS_KEY, favoriteIds)
+        } catch (e) {
+          // 忽略
+        }
+      }
     },
 
     // 点赞

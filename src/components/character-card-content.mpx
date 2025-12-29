@@ -112,6 +112,9 @@ const GREETING_CACHE_KEY = 'greeting_cache'
 const CONVERSATION_CACHE_KEY = 'last_conversation_id'
 const HOME_CHARACTER_CACHE_KEY = 'home_character'
 
+// 每 N 条消息触发一次摘要更新（20条 = 10轮对话）
+const MEMORY_UPDATE_MESSAGE_INTERVAL = 20
+
 createComponent({
   properties: {
     // 角色数据
@@ -162,6 +165,9 @@ createComponent({
         } catch (e) {
           // 忽略错误
         }
+
+        // 触发记忆摘要更新（异步，不阻塞页面卸载）
+        this.triggerMemoryUpdate()
       }
     }
   },
@@ -169,9 +175,24 @@ createComponent({
   methods: {
     // 初始化
     async init() {
-      if (this.initialConversationId) {
+      let conversationId = this.initialConversationId
+
+      // 如果没有传入 conversationId，尝试从缓存获取
+      if (!conversationId && this.character?.id) {
+        try {
+          const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
+          // 如果缓存的角色与当前角色匹配，使用缓存的 conversationId
+          if (cached && cached.characterId === this.character.id && cached.conversationId) {
+            conversationId = cached.conversationId
+          }
+        } catch (e) {
+          // 忽略错误
+        }
+      }
+
+      if (conversationId) {
         // 如果有 conversationId，加载已有对话
-        this.conversationId = this.initialConversationId
+        this.conversationId = conversationId
         await this.loadExistingConversation()
 
         // 如果有初始消息，在加载完成后自动发送
@@ -278,6 +299,12 @@ createComponent({
         this.messages = [...this.messages, response.assistantMessage]
 
         this.scrollToBottom()
+
+        // 4. 检查是否需要触发摘要更新（每 20 条消息触发一次）
+        if (this.messages.length > 0 && this.messages.length % MEMORY_UPDATE_MESSAGE_INTERVAL === 0) {
+          console.log(`[Memory] 消息数达到 ${this.messages.length}，触发摘要更新`)
+          this.triggerMemoryUpdate()
+        }
       } catch (err: any) {
         wx.showToast({ title: err.message || '发送失败', icon: 'none' })
       } finally {
@@ -292,38 +319,33 @@ createComponent({
       })
     },
 
-    // 检查是否已固定到首页
+    // 检查是否已固定到首页（从本地缓存判断，用于快速显示）
     checkIfPinned() {
       try {
         const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
-        if (cached && cached.conversationId === this.conversationId) {
-          this.isPinned = true
-        } else {
-          this.isPinned = false
-        }
+        this.isPinned = cached && cached.characterId === this.character?.id
       } catch (e) {
         this.isPinned = false
       }
     },
 
     // 固定/取消固定到首页
-    handlePinToHome() {
-      if (!this.character || !this.conversationId) {
+    async handlePinToHome() {
+      if (!this.character) {
         wx.showToast({ title: '角色信息加载中...', icon: 'none' })
         return
       }
 
       try {
-        if (this.isPinned) {
-          // 取消固定
-          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
-          this.isPinned = false
-          wx.showToast({ title: '已取消固定', icon: 'success' })
-        } else {
-          // 固定到首页
+        // 调用后端接口
+        const result = await characterApi.togglePinToHome(this.character.id)
+        this.isPinned = result.isPinnedToHome
+
+        if (result.isPinnedToHome) {
+          // 固定成功，更新本地缓存
           const cacheData = {
             characterId: this.character.id,
-            conversationId: this.conversationId,
+            conversationId: this.conversationId || null,
             character: {
               id: this.character.id,
               name: this.character.name,
@@ -332,11 +354,19 @@ createComponent({
             },
             timestamp: Date.now()
           }
-
           wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
-          this.isPinned = true
           wx.showToast({ title: '已固定到首页', icon: 'success' })
+        } else {
+          // 取消固定，清空本地缓存
+          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+          wx.showToast({ title: '已取消固定', icon: 'success' })
         }
+
+        // 通知父组件更新其他角色卡片的固定状态
+        this.triggerEvent('pinToHome', {
+          character: this.character,
+          isPinned: result.isPinnedToHome
+        })
       } catch (e: any) {
         wx.showToast({ title: e.message || '操作失败', icon: 'none' })
       }
@@ -355,6 +385,30 @@ createComponent({
     // 切换收藏
     handleToggleFavorite() {
       this.triggerEvent('toggleFavorite', { characterId: this.character.id })
+    },
+
+    /**
+     * 触发记忆摘要更新
+     * 异步执行，不阻塞页面操作
+     */
+    triggerMemoryUpdate() {
+      if (!this.conversationId || !this.hasStartedChat) {
+        return
+      }
+
+      // 使用异步调用，不等待结果
+      conversationApi.updateMemorySummary(this.conversationId)
+        .then((result: { updated: boolean; message?: string; messagesProcessed?: number }) => {
+          if (result.updated) {
+            console.log(`[Memory] 记忆摘要已更新，处理了 ${result.messagesProcessed} 条消息`)
+          } else {
+            console.log(`[Memory] ${result.message || '无需更新'}`)
+          }
+        })
+        .catch((err: Error) => {
+          // 静默失败，不影响用户体验
+          console.warn('[Memory] 摘要更新失败:', err.message)
+        })
     }
   }
 })
