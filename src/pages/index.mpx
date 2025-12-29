@@ -20,8 +20,8 @@
       <view class="side-nav-item" bindtap="navigateToConversations">
         <text class="side-nav-text">消息</text>
       </view>
-      <view class="side-nav-item" bindtap="navigateToCharacters">
-        <text class="side-nav-text">广场</text>
+      <view class="side-nav-item" bindtap="navigateToCreateCharacters">
+        <text class="side-nav-text">创建角色</text>
       </view>
     </view>
   </view>
@@ -274,9 +274,9 @@ createPage({
         url: '/pages/character-select'
       })
     },
-    navigateToCharacters() {
+    navigateToCreateCharacters() {
       wx.navigateTo({
-        url: '/pages/characters'
+        url: '/pages/create-character'
       })
     },
     navigateToConversations() {
