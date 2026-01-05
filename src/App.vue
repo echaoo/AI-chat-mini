@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import AddToHomeScreen from './components/AddToHomeScreen.vue'
 </script>
 
 <template>
   <router-view />
+  <AddToHomeScreen />
 </template>
 
 <style>
