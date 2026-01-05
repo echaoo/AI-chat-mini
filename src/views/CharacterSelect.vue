@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { characterApi } from '../api'
 import type { Character } from '../types'
@@ -10,6 +10,14 @@ const route = useRoute()
 const characters = ref<Character[]>([])
 const currentIndex = ref(0)
 const loading = ref(true)
+
+// 触摸滑动相关
+const touchStartY = ref(0)
+const touchStartTime = ref(0)
+const translateY = ref(0)
+const isSwiping = ref(false)
+const isAnimating = ref(false)
+const containerHeight = ref(window.innerHeight)
 
 onMounted(async () => {
   try {
@@ -32,6 +40,11 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+
+  // 监听窗口大小变化
+  window.addEventListener('resize', () => {
+    containerHeight.value = window.innerHeight
+  })
 })
 
 function goBack() {
@@ -46,15 +59,96 @@ function startChat(character: Character) {
   router.push({ path: '/chat', query: { characterId: String(character.id) } })
 }
 
-function prevCharacter() {
-  if (currentIndex.value > 0) {
-    currentIndex.value--
+// 触摸事件处理
+function onTouchStart(e: TouchEvent) {
+  if (isAnimating.value) return
+  touchStartY.value = e.touches[0].clientY
+  touchStartTime.value = Date.now()
+  isSwiping.value = true
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (!isSwiping.value || isAnimating.value) return
+  e.preventDefault()
+
+  const currentY = e.touches[0].clientY
+  let delta = currentY - touchStartY.value
+
+  // 边界阻尼效果
+  const isAtTop = currentIndex.value === 0 && delta > 0
+  const isAtBottom = currentIndex.value === characters.value.length - 1 && delta < 0
+
+  if (isAtTop || isAtBottom) {
+    // 边界时添加阻尼，滑动距离减半
+    delta = delta * 0.3
+  }
+
+  translateY.value = delta
+}
+
+function onTouchEnd() {
+  if (!isSwiping.value || isAnimating.value) return
+  isSwiping.value = false
+
+  const touchEndTime = Date.now()
+  const duration = touchEndTime - touchStartTime.value
+  const velocity = Math.abs(translateY.value) / duration // 滑动速度
+
+  const threshold = containerHeight.value * 0.15 // 滑动超过15%屏幕高度
+  const velocityThreshold = 0.3 // 速度阈值
+
+  // 根据滑动距离或速度判断是否切换
+  const shouldSwitch = Math.abs(translateY.value) > threshold || velocity > velocityThreshold
+
+  if (shouldSwitch) {
+    if (translateY.value < 0 && currentIndex.value < characters.value.length - 1) {
+      // 向上滑动，切换到下一个
+      animateToIndex(currentIndex.value + 1)
+    } else if (translateY.value > 0 && currentIndex.value > 0) {
+      // 向下滑动，切换到上一个
+      animateToIndex(currentIndex.value - 1)
+    } else {
+      // 边界回弹
+      animateToIndex(currentIndex.value)
+    }
+  } else {
+    // 回弹到当前位置
+    animateToIndex(currentIndex.value)
   }
 }
 
-function nextCharacter() {
-  if (currentIndex.value < characters.value.length - 1) {
-    currentIndex.value++
+function animateToIndex(targetIndex: number) {
+  isAnimating.value = true
+  currentIndex.value = targetIndex
+  translateY.value = 0
+
+  setTimeout(() => {
+    isAnimating.value = false
+  }, 300)
+}
+
+// 计算每个卡片的样式
+function getCardStyle(index: number) {
+  const diff = index - currentIndex.value
+  const baseOffset = diff * containerHeight.value
+
+  // 滑动时的实时偏移
+  const swipeOffset = isSwiping.value ? translateY.value : 0
+  const finalOffset = baseOffset + swipeOffset
+
+  // 只渲染当前卡片和相邻卡片
+  if (Math.abs(diff) > 1) {
+    return {
+      transform: `translateY(${diff > 0 ? '100%' : '-100%'})`,
+      opacity: 0,
+      pointerEvents: 'none' as const
+    }
+  }
+
+  return {
+    transform: `translateY(${finalOffset}px)`,
+    transition: isSwiping.value ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+    zIndex: index === currentIndex.value ? 10 : 5
   }
 }
 </script>
@@ -72,13 +166,19 @@ function nextCharacter() {
     </div>
 
     <template v-else-if="characters.length > 0">
-      <!-- 角色卡片轮播 -->
-      <div class="flex-1 relative">
+      <!-- 角色卡片轮播容器 -->
+      <div
+        class="flex-1 relative touch-none"
+        @touchstart="onTouchStart"
+        @touchmove.prevent="onTouchMove"
+        @touchend="onTouchEnd"
+      >
+        <!-- 所有卡片 -->
         <div
           v-for="(char, index) in characters"
           :key="char.id"
-          class="absolute inset-0 transition-opacity duration-300"
-          :class="index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'"
+          class="absolute inset-0 will-change-transform"
+          :style="getCardStyle(index)"
         >
           <!-- 背景图 -->
           <div
@@ -89,7 +189,7 @@ function nextCharacter() {
           </div>
 
           <!-- 角色信息 -->
-          <div class="absolute bottom-0 left-0 right-0 p-6 z-10">
+          <div class="absolute bottom-0 left-0 right-0 p-6 z-10 safe-area-bottom">
             <h2 class="text-white text-2xl font-bold mb-2">{{ char.name }}</h2>
             <p class="text-white/80 text-sm mb-4 line-clamp-3">
               {{ char.description || char.greetingMessage || '暂无描述' }}
@@ -111,31 +211,6 @@ function nextCharacter() {
           </div>
         </div>
 
-        <!-- 左右切换按钮 -->
-        <button
-          v-if="currentIndex > 0"
-          class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/20 rounded-full text-white"
-          @click="prevCharacter"
-        >
-          ‹
-        </button>
-        <button
-          v-if="currentIndex < characters.length - 1"
-          class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/20 rounded-full text-white"
-          @click="nextCharacter"
-        >
-          ›
-        </button>
-
-        <!-- 指示器 -->
-        <div class="absolute bottom-32 left-1/2 -translate-x-1/2 z-20 flex gap-1">
-          <span
-            v-for="(_, index) in characters"
-            :key="index"
-            class="w-2 h-2 rounded-full transition-colors"
-            :class="index === currentIndex ? 'bg-white' : 'bg-white/40'"
-          ></span>
-        </div>
       </div>
     </template>
 
@@ -148,5 +223,9 @@ function nextCharacter() {
 <style scoped>
 .safe-area-top {
   padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.safe-area-bottom {
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
 }
 </style>
