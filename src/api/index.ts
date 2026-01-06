@@ -8,7 +8,8 @@ import type {
   CreateConversationResponse,
   CreateCharacterRequest,
   SendMessageResponse,
-  ConversationMessagesResponse
+  ConversationMessagesResponse,
+  ChatMode
 } from '../types'
 
 /**
@@ -110,9 +111,10 @@ export const conversationApi = {
 
   /**
    * 发送消息
+   * @param chatMode 对话模式: 'normal' | 'romantic'
    */
-  sendMessage(conversationId: number, content: string): Promise<SendMessageResponse> {
-    return post<SendMessageResponse>(`/companion/conversations/${conversationId}/messages`, { content })
+  sendMessage(conversationId: number, content: string, chatMode?: ChatMode): Promise<SendMessageResponse> {
+    return post<SendMessageResponse>(`/companion/conversations/${conversationId}/messages`, { content, chatMode })
   },
 
   /**

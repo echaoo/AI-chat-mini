@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { characterApi, conversationApi } from '../api'
 import { storage, STORAGE_KEYS } from '../utils/storage'
 import MessageBubble from '../components/MessageBubble.vue'
-import type { Character, Message, Conversation } from '../types'
+import type { Character, Message, Conversation, ChatMode } from '../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -35,6 +35,7 @@ const showHistoryForCharacter = ref<number | null>(null)
 const loadingMessages = ref<Set<number>>(new Set())
 const waitingReply = ref<Set<number>>(new Set()) // 等待AI回复的角色
 const messageListRefs = ref<Map<number, HTMLElement>>(new Map())
+const chatMode = ref<ChatMode>('normal') // 对话模式
 
 // 当前角色
 const currentCharacter = computed(() => characters.value[currentIndex.value] || null)
@@ -181,6 +182,32 @@ function goBack() {
   router.back()
 }
 
+function toggleChatMode() {
+  const newMode: ChatMode = chatMode.value === 'normal' ? 'romantic' : 'normal'
+  chatMode.value = newMode
+
+  // 如果当前角色有会话，添加系统消息提示
+  const char = currentCharacter.value
+  if (char) {
+    const systemMessage: Message = {
+      id: Date.now(),
+      conversationId: 0,
+      role: 'system',
+      content: newMode === 'romantic' ? '已切换到心动模式' : '已切换到基础模式',
+      tokens: null,
+      createdAt: new Date().toISOString()
+    }
+
+    const messages = getMessages(char.id)
+    if (messages.length > 0 || showHistoryForCharacter.value === char.id) {
+      characterMessages.value.set(char.id, [...messages, systemMessage])
+      if (showHistoryForCharacter.value === char.id) {
+        scrollToBottom(char.id)
+      }
+    }
+  }
+}
+
 function handleButtonClick(event: Event) {
   event.stopPropagation()
   event.preventDefault()
@@ -309,7 +336,7 @@ async function handleSend() {
     waitingReply.value.add(char.id)
 
     // 发送消息并获取回复
-    const response = await conversationApi.sendMessage(conv.id, content)
+    const response = await conversationApi.sendMessage(conv.id, content, chatMode.value)
 
     // 移除等待状态
     waitingReply.value.delete(char.id)
@@ -447,6 +474,16 @@ function getCardStyle(index: number) {
       <button class="w-8 h-8 flex items-center justify-center rounded-full bg-black/30 text-white" @click="goBack">
         <span class="text-lg">←</span>
       </button>
+      <!-- 模式切换按钮 -->
+      <button
+        class="px-3 py-1.5 rounded-full text-xs font-medium transition-all backdrop-blur-sm"
+        :class="chatMode === 'romantic'
+          ? 'bg-pink-500/80 text-white'
+          : 'bg-black/30 text-white/80'"
+        @click="toggleChatMode"
+      >
+        {{ chatMode === 'romantic' ? '心动模式' : '基础模式' }}
+      </button>
     </div>
 
     <div v-if="loading" class="flex-1 flex items-center justify-center text-white">
@@ -526,7 +563,7 @@ function getCardStyle(index: number) {
                 </template>
                 <template v-else>
                   <div class="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg">
-                    <p class="text-gray-800 text-sm leading-relaxed line-clamp-3">
+                    <p class="text-gray-800 text-sm leading-relaxed line-clamp-[12]">
                       {{ getLastMessage(char.id)?.content || '...' }}
                     </p>
                   </div>
@@ -534,7 +571,7 @@ function getCardStyle(index: number) {
               </template>
               <!-- 无聊天记录：显示角色介绍 -->
               <template v-else>
-                <p class="text-white/90 text-sm leading-relaxed line-clamp-4">
+                <p class="text-white/90 text-sm leading-relaxed line-clamp-[12]">
                   {{ char.description || '这个角色很神秘，没有留下任何介绍...' }}
                 </p>
               </template>

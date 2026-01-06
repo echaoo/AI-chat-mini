@@ -7,7 +7,16 @@ defineProps<{
 </script>
 
 <template>
+  <!-- 系统消息（居中显示） -->
+  <div v-if="message.role === 'system'" class="flex justify-center mb-3">
+    <div class="px-4 py-1.5 rounded-full bg-gray-200/80 text-gray-500 text-xs">
+      {{ message.content }}
+    </div>
+  </div>
+
+  <!-- 用户/AI消息 -->
   <div
+    v-else
     class="flex mb-3"
     :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
   >

@@ -2,6 +2,9 @@
  * AI 陪伴 H5 - 类型定义
  */
 
+// 对话模式
+export type ChatMode = 'normal' | 'romantic'
+
 // 角色
 export interface Character {
   id: number
@@ -66,7 +69,7 @@ export interface CreateConversationResponse {
 export interface Message {
   id: number
   conversationId: number
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   tokens: number | null
   createdAt: string

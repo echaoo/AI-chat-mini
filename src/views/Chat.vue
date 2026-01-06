@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import MessageBubble from '../components/MessageBubble.vue'
 import { characterApi, conversationApi } from '../api'
 import { storage, STORAGE_KEYS } from '../utils/storage'
-import type { Character, Message } from '../types'
+import type { Character, Message, ChatMode } from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,6 +18,7 @@ const loading = ref(true)
 const sending = ref(false)
 const isPinned = ref(false)
 const messageListRef = ref<HTMLElement | null>(null)
+const chatMode = ref<ChatMode>('normal')
 
 onMounted(() => {
   const queryConvId = route.query.conversationId as string
@@ -137,7 +138,7 @@ async function handleSend() {
   scrollToBottom()
 
   try {
-    const response = await conversationApi.sendMessage(conversationId.value, content)
+    const response = await conversationApi.sendMessage(conversationId.value, content, chatMode.value)
     messages.value = [...messages.value, response.assistantMessage]
     scrollToBottom()
   } catch (err: any) {
@@ -145,6 +146,23 @@ async function handleSend() {
   } finally {
     sending.value = false
   }
+}
+
+function toggleChatMode() {
+  const newMode: ChatMode = chatMode.value === 'normal' ? 'romantic' : 'normal'
+  chatMode.value = newMode
+
+  // 添加系统消息提示
+  const systemMessage: Message = {
+    id: Date.now(),
+    conversationId: conversationId.value,
+    role: 'system',
+    content: newMode === 'romantic' ? '已切换到心动模式' : '已切换到基础模式',
+    tokens: null,
+    createdAt: new Date().toISOString()
+  }
+  messages.value = [...messages.value, systemMessage]
+  scrollToBottom()
 }
 
 function scrollToBottom() {
@@ -200,9 +218,21 @@ function goBack() {
 <template>
   <div class="h-screen flex flex-col bg-gray-100">
     <!-- 顶部导航 -->
-    <div class="flex items-center px-4 py-3 bg-white border-b border-gray-200 safe-area-top">
-      <button class="text-gray-600 mr-3" @click="goBack">←</button>
-      <span class="text-lg font-medium">{{ character?.name || '聊天' }}</span>
+    <div class="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 safe-area-top">
+      <div class="flex items-center">
+        <button class="text-gray-600 mr-3" @click="goBack">←</button>
+        <span class="text-lg font-medium">{{ character?.name || '聊天' }}</span>
+      </div>
+      <!-- 模式切换按钮 -->
+      <button
+        class="px-3 py-1 rounded-full text-xs font-medium transition-all"
+        :class="chatMode === 'romantic'
+          ? 'bg-pink-100 text-pink-600 border border-pink-300'
+          : 'bg-gray-100 text-gray-600 border border-gray-300'"
+        @click="toggleChatMode"
+      >
+        {{ chatMode === 'romantic' ? '心动模式' : '基础模式' }}
+      </button>
     </div>
 
     <!-- 消息列表 -->
