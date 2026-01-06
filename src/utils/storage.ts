@@ -32,6 +32,5 @@ export const storage = {
 // 缓存 Key 常量
 export const STORAGE_KEYS = {
   GREETING_CACHE: 'greeting_cache',
-  CONVERSATION_CACHE: 'last_conversation_id',
   HOME_CHARACTER: 'home_character'
 }

@@ -45,9 +45,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   storage.remove(STORAGE_KEYS.GREETING_CACHE)
-  if (conversationId.value) {
-    storage.set(STORAGE_KEYS.CONVERSATION_CACHE, conversationId.value)
-  }
 })
 
 async function init() {

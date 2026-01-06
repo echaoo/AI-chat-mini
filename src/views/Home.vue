@@ -80,10 +80,7 @@ function updateAndDisplayGreeting() {
 
 async function fetchAndCacheNewGreeting() {
   setTimeout(async () => {
-    let convId = conversationId.value
-    if (!convId) {
-      convId = storage.get<number>(STORAGE_KEYS.CONVERSATION_CACHE)
-    }
+    const convId = conversationId.value
 
     if (!convId) {
       const newGreeting = getGreeting('qiyu')
@@ -113,10 +110,7 @@ function saveGreetingToCache(text: string) {
 }
 
 function navigateToChat() {
-  let convId = conversationId.value
-  if (!convId) {
-    convId = storage.get<number>(STORAGE_KEYS.CONVERSATION_CACHE)
-  }
+  const convId = conversationId.value
 
   const query: Record<string, string> = {}
   if (characterId.value) {
