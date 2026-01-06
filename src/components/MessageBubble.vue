@@ -12,7 +12,7 @@ defineProps<{
     :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
   >
     <div
-      class="max-w-[75%] px-4 py-2.5 rounded-2xl"
+      class="max-w-[85%] px-4 py-2.5 rounded-2xl"
       :class="message.role === 'user'
         ? 'bg-black text-white'
         : 'bg-white/90 shadow-sm'"

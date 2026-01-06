@@ -151,7 +151,7 @@ function navigateToCreateCharacter() {
     <!-- 主要内容 -->
     <div class="relative z-10 w-full flex flex-col items-start px-5">
       <!-- 文本卡片 -->
-      <div class="relative w-[70%] bg-white/10 border border-white/10 border-t-0 rounded-br-2xl rounded-bl-2xl rounded-tr-2xl p-5 mb-8 backdrop-blur-md">
+      <div class="relative bg-white/10 border border-white/10 border-t-0 rounded-br-2xl rounded-bl-2xl rounded-tr-2xl p-5 mb-8 backdrop-blur-md">
         <div class="absolute -top-8 left-0 text-white text-lg font-bold">
           {{ characterName }}
         </div>

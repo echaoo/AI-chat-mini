@@ -129,6 +129,8 @@ async function loadCharacterMessages(characterId: number) {
   try {
     const response = await conversationApi.getConversationMessages(conv.id)
     characterMessages.value.set(characterId, response.messages || [])
+    // 加载完成后滚动到底部
+    nextTick(() => scrollToBottom(characterId))
   } catch (e) {
     console.error('加载消息失败', e)
   } finally {
@@ -136,7 +138,7 @@ async function loadCharacterMessages(characterId: number) {
   }
 }
 
-function toggleHistory(char: Character, event: Event) {
+async function toggleHistory(char: Character, event: Event) {
   event.stopPropagation()
   event.preventDefault()
 
@@ -145,9 +147,11 @@ function toggleHistory(char: Character, event: Event) {
   } else {
     showHistoryForCharacter.value = char.id
     if (!characterMessages.value.has(char.id)) {
-      loadCharacterMessages(char.id)
+      await loadCharacterMessages(char.id)
+    } else {
+      // 已有消息，直接滚动到底部
+      nextTick(() => scrollToBottom(char.id))
     }
-    nextTick(() => scrollToBottom(char.id))
   }
 }
 
@@ -360,6 +364,9 @@ function onTouchStart(e: TouchEvent) {
 function onTouchMove(e: TouchEvent) {
   if (!isSwiping.value || isAnimating.value) return
 
+  // 只在滑动切换时阻止默认行为
+  e.preventDefault()
+
   const currentY = e.touches[0].clientY
   let delta = currentY - touchStartY.value
 
@@ -449,9 +456,9 @@ function getCardStyle(index: number) {
     <template v-else-if="characters.length > 0">
       <!-- 角色卡片轮播容器 -->
       <div
-        class="flex-1 relative touch-none"
+        class="flex-1 relative"
         @touchstart="onTouchStart"
-        @touchmove.prevent="onTouchMove"
+        @touchmove="onTouchMove"
         @touchend="onTouchEnd"
       >
         <!-- 所有卡片 -->
@@ -490,8 +497,8 @@ function getCardStyle(index: number) {
                     暂无消息记录
                   </div>
                   <!-- 等待回复动画 -->
-                  <div v-if="waitingReply.has(char.id)" class="flex justify-start mb-3">
-                    <div class="bg-white/90 rounded-2xl px-4 py-3">
+                  <div v-if="waitingReply.has(char.id)" class="mb-3">
+                    <div class="bg-white/90 rounded-2xl px-4 py-2.5 inline-block">
                       <div class="typing-dots">
                         <span></span>
                         <span></span>
@@ -507,21 +514,23 @@ function getCardStyle(index: number) {
             <div v-if="showHistoryForCharacter !== char.id" class="absolute bottom-0 left-0 right-0 p-4">
               <!-- 有聊天记录：显示最后一条消息 -->
               <template v-if="hasHistory(char.id) || getLastMessage(char.id)">
-                <div class="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg">
-                  <!-- 等待回复时显示加载动画 -->
-                  <template v-if="waitingReply.has(char.id)">
+                <!-- 等待回复时显示加载动画 -->
+                <template v-if="waitingReply.has(char.id)">
+                  <div class="bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg inline-block">
                     <div class="typing-dots">
                       <span></span>
                       <span></span>
                       <span></span>
                     </div>
-                  </template>
-                  <template v-else>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg">
                     <p class="text-gray-800 text-sm leading-relaxed line-clamp-3">
                       {{ getLastMessage(char.id)?.content || '...' }}
                     </p>
-                  </template>
-                </div>
+                  </div>
+                </template>
               </template>
               <!-- 无聊天记录：显示角色介绍 -->
               <template v-else>
@@ -632,6 +641,9 @@ function getCardStyle(index: number) {
 .history-panel {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .history-panel::-webkit-scrollbar {
