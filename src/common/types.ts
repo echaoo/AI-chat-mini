@@ -13,6 +13,9 @@ export interface Character {
   isOfficial: number
   isActive: number
   sortOrder: number
+  chatBackgroundUrl: string | null
+  sleepBackgroundUrl: string | null
+  companionBackgroundUrl: string | null
   createdAt: string
   updatedAt: string
   // 后端返回的聊天统计字段（需要认证）
@@ -31,6 +34,9 @@ export interface CreateCharacterRequest {
   systemPrompt: string
   greetingMessage?: string
   avatarUrl?: string
+  chatBackgroundUrl?: string
+  sleepBackgroundUrl?: string
+  companionBackgroundUrl?: string
 }
 
 // 对话

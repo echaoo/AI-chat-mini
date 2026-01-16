@@ -58,6 +58,74 @@
           bindinput="handleAvatarUrlInput"
         />
       </view>
+
+      <!-- 背景图上传区域 -->
+      <view class="form-item">
+        <text class="label">背景图设置</text>
+        <text class="tip">为不同场景设置专属背景图（可选）</text>
+
+        <view class="background-list">
+          <!-- 聊天背景图 -->
+          <view class="background-item">
+            <text class="bg-label">聊天背景</text>
+            <view class="bg-upload" bindtap="handleChooseBackground" data-type="chat">
+              <image
+                wx:if="{{form.chatBackgroundUrl}}"
+                class="bg-preview"
+                src="{{form.chatBackgroundUrl}}"
+                mode="aspectFill"
+              />
+              <view wx:else class="bg-placeholder">
+                <text class="bg-icon">+</text>
+                <text class="bg-text">{{uploading.chat ? '上传中...' : '点击上传'}}</text>
+              </view>
+              <view wx:if="{{form.chatBackgroundUrl}}" class="bg-delete" catchtap="handleDeleteBackground" data-type="chat">
+                <text class="delete-icon">×</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 哄睡背景图 -->
+          <view class="background-item">
+            <text class="bg-label">哄睡背景</text>
+            <view class="bg-upload" bindtap="handleChooseBackground" data-type="sleep">
+              <image
+                wx:if="{{form.sleepBackgroundUrl}}"
+                class="bg-preview"
+                src="{{form.sleepBackgroundUrl}}"
+                mode="aspectFill"
+              />
+              <view wx:else class="bg-placeholder">
+                <text class="bg-icon">+</text>
+                <text class="bg-text">{{uploading.sleep ? '上传中...' : '点击上传'}}</text>
+              </view>
+              <view wx:if="{{form.sleepBackgroundUrl}}" class="bg-delete" catchtap="handleDeleteBackground" data-type="sleep">
+                <text class="delete-icon">×</text>
+              </view>
+            </view>
+          </view>
+
+          <!-- 陪伴背景图 -->
+          <view class="background-item">
+            <text class="bg-label">陪伴背景</text>
+            <view class="bg-upload" bindtap="handleChooseBackground" data-type="companion">
+              <image
+                wx:if="{{form.companionBackgroundUrl}}"
+                class="bg-preview"
+                src="{{form.companionBackgroundUrl}}"
+                mode="aspectFill"
+              />
+              <view wx:else class="bg-placeholder">
+                <text class="bg-icon">+</text>
+                <text class="bg-text">{{uploading.companion ? '上传中...' : '点击上传'}}</text>
+              </view>
+              <view wx:if="{{form.companionBackgroundUrl}}" class="bg-delete" catchtap="handleDeleteBackground" data-type="companion">
+                <text class="delete-icon">×</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view class="actions">
@@ -70,7 +138,7 @@
 
 <script lang="ts">
 import mpx, { createPage } from '@mpxjs/core'
-import { characterApi } from '../common/api'
+import { characterApi, BackgroundType } from '../common/api'
 
 createPage({
   data: {
@@ -79,7 +147,15 @@ createPage({
       description: '',
       systemPrompt: '',
       greetingMessage: '',
-      avatarUrl: ''
+      avatarUrl: '',
+      chatBackgroundUrl: '',
+      sleepBackgroundUrl: '',
+      companionBackgroundUrl: ''
+    },
+    uploading: {
+      chat: false,
+      sleep: false,
+      companion: false
     },
     submitting: false,
     canSubmit: false
@@ -87,16 +163,6 @@ createPage({
 
   onLoad() {
     // 可以添加一些示例数据，方便测试
-    // this.setData({
-    //   form: {
-    //     name: '温柔学姐',
-    //     description: '一个温柔体贴的学姐',
-    //     systemPrompt: '你是一个温柔体贴的学姐，说话温和有礼，善于倾听和安慰他人。',
-    //     greetingMessage: '你好呀，今天过得怎么样？',
-    //     avatarUrl: ''
-    //   }
-    // })
-    // this.checkCanSubmit()
   },
 
   methods: {
@@ -139,10 +205,80 @@ createPage({
       })
     },
 
+    // 选择并上传背景图
+    async handleChooseBackground(e: any) {
+      const type = e.currentTarget.dataset.type as BackgroundType
+
+      // 如果正在上传，不处理
+      if (this.uploading[type]) return
+
+      try {
+        // 选择图片
+        const res = await mpx.chooseImage({
+          count: 1,
+          sizeType: ['compressed'],
+          sourceType: ['album', 'camera']
+        })
+
+        const filePath = res.tempFilePaths[0]
+
+        // 设置上传状态
+        this.setData({
+          [`uploading.${type}`]: true
+        })
+
+        // 上传图片
+        const result = await characterApi.uploadBackground(filePath, type)
+
+        // 根据类型设置对应的URL
+        const urlKey = `form.${type}BackgroundUrl`
+        this.setData({
+          [urlKey]: result.url
+        })
+
+        mpx.showToast({
+          title: '上传成功',
+          icon: 'success'
+        })
+      } catch (error: any) {
+        console.error('上传背景图失败:', error)
+        // 用户取消选择不提示错误
+        if (error.errMsg && error.errMsg.includes('cancel')) {
+          return
+        }
+        mpx.showToast({
+          title: error.message || '上传失败',
+          icon: 'none'
+        })
+      } finally {
+        this.setData({
+          [`uploading.${type}`]: false
+        })
+      }
+    },
+
+    // 删除背景图
+    handleDeleteBackground(e: any) {
+      const type = e.currentTarget.dataset.type as BackgroundType
+      const urlKey = `form.${type}BackgroundUrl`
+      this.setData({
+        [urlKey]: ''
+      })
+    },
+
     async handleCreate() {
       if (!this.canSubmit || this.submitting) return
 
-      const { name, description, systemPrompt, greetingMessage, avatarUrl } = this.form
+      const {
+        name,
+        description,
+        systemPrompt,
+        greetingMessage,
+        avatarUrl,
+        chatBackgroundUrl,
+        sleepBackgroundUrl,
+        companionBackgroundUrl
+      } = this.form
 
       // 验证必填项
       if (!name.trim()) {
@@ -169,7 +305,10 @@ createPage({
           description: description.trim() || undefined,
           systemPrompt: systemPrompt.trim(),
           greetingMessage: greetingMessage.trim() || undefined,
-          avatarUrl: avatarUrl.trim() || undefined
+          avatarUrl: avatarUrl.trim() || undefined,
+          chatBackgroundUrl: chatBackgroundUrl || undefined,
+          sleepBackgroundUrl: sleepBackgroundUrl || undefined,
+          companionBackgroundUrl: companionBackgroundUrl || undefined
         })
         console.log('角色添加', character)
         mpx.showToast({
@@ -255,6 +394,76 @@ createPage({
     margin-top 12rpx
     font-size 24rpx
     color #999
+
+// 背景图上传样式
+.background-list
+  display flex
+  justify-content space-between
+  margin-top 24rpx
+
+.background-item
+  flex 1
+  margin 0 12rpx
+
+  &:first-child
+    margin-left 0
+
+  &:last-child
+    margin-right 0
+
+  .bg-label
+    display block
+    font-size 24rpx
+    color #666
+    text-align center
+    margin-bottom 12rpx
+
+.bg-upload
+  position relative
+  width 100%
+  height 180rpx
+  border-radius 12rpx
+  overflow hidden
+  background #f8f8f8
+  border 2rpx dashed #ddd
+
+  .bg-preview
+    width 100%
+    height 100%
+
+  .bg-placeholder
+    display flex
+    flex-direction column
+    align-items center
+    justify-content center
+    height 100%
+
+    .bg-icon
+      font-size 48rpx
+      color #ccc
+      line-height 1
+
+    .bg-text
+      font-size 22rpx
+      color #999
+      margin-top 8rpx
+
+  .bg-delete
+    position absolute
+    top 8rpx
+    right 8rpx
+    width 40rpx
+    height 40rpx
+    background rgba(0, 0, 0, 0.5)
+    border-radius 50%
+    display flex
+    align-items center
+    justify-content center
+
+    .delete-icon
+      color #fff
+      font-size 28rpx
+      line-height 1
 
 .actions
   position fixed

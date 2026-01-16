@@ -181,6 +181,9 @@ createPage({
           isOfficial: 1,
           isActive: 1,
           sortOrder: 0,
+          chatBackgroundUrl: null,
+          sleepBackgroundUrl: null,
+          companionBackgroundUrl: null,
           createdAt: '',
           updatedAt: ''
         }

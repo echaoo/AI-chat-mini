@@ -1,8 +1,15 @@
 /**
  * API 接口封装
  */
+import mpx from '@mpxjs/core'
 import { get, post, del } from './request'
+import { API_BASE_URL, TEST_TOKEN } from './config'
 import type { Character, Conversation, CreateConversationResponse, Message, CreateCharacterRequest, SendMessageResponse, ConversationMessagesResponse } from './types'
+
+/**
+ * 背景图类型
+ */
+export type BackgroundType = 'chat' | 'sleep' | 'companion'
 
 /**
  * 角色相关 API
@@ -72,6 +79,41 @@ export const characterApi = {
    */
   togglePinToHome(characterId: number): Promise<{ characterId: number; isPinnedToHome: boolean }> {
     return post(`/companion/characters/${characterId}/pin-to-home`, {})
+  },
+
+  /**
+   * 上传角色背景图
+   * @param filePath 本地文件路径
+   * @param type 背景图类型: chat(聊天), sleep(哄睡), companion(陪伴)
+   */
+  uploadBackground(filePath: string, type: BackgroundType): Promise<{ url: string; type: BackgroundType }> {
+    return new Promise((resolve, reject) => {
+      mpx.uploadFile({
+        url: `${API_BASE_URL}/companion/characters/upload-background`,
+        filePath,
+        name: 'file',
+        formData: { type },
+        header: {
+          'Authorization': `Bearer ${TEST_TOKEN}`
+        },
+        success: (res: any) => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            const data = JSON.parse(res.data)
+            if (data.data) {
+              resolve(data.data)
+            } else {
+              resolve(data)
+            }
+          } else {
+            const errorData = JSON.parse(res.data || '{}')
+            reject(new Error(errorData.message || '上传失败'))
+          }
+        },
+        fail: (err: any) => {
+          reject(new Error(err.errMsg || '上传失败'))
+        }
+      })
+    })
   }
 }
 
