@@ -15,30 +15,36 @@
       </view>
     </view>
 
-    <!-- 聊天状态：显示消息列表 -->
-    <scroll-view
-      wx:else
-      scroll-y
-      class="message-list"
-      scroll-into-view="{{scrollToView}}"
-      scroll-with-animation
-    >
-      <view wx:if="{{loading}}" class="loading">
-        <text>加载中...</text>
-      </view>
+    <!-- 聊天状态：默认仅展示最后一条 AI 回复 -->
+    <view wx:else class="chat-state">
+      <scroll-view
+        scroll-y
+        class="message-list {{!historyReady ? 'is-preparing' : ''}}"
+        scroll-top="{{scrollTop}}"
+        scroll-with-animation="{{scrollWithAnimation}}"
+        show-scrollbar="{{false}}"
+      >
+        <view wx:if="{{loading}}" class="loading">
+          <text>加载中...</text>
+        </view>
 
-      <view wx:else>
-        <message-bubble
-          wx:for="{{messages}}"
-          wx:key="id"
-          id="msg-{{item.id}}"
-          message="{{item}}"
-        />
-      </view>
+        <view wx:else class="message-list-inner {{!showHistory ? 'preview-mode' : ''}}">
+          <view wx:if="{{!loading && messages.length === 0}}" class="empty-preview">
+            <text>暂无历史消息</text>
+          </view>
+          <message-bubble
+            wx:for="{{messages}}"
+            wx:key="id"
+            id="msg-{{item.id}}"
+            class="message-item"
+            message="{{item}}"
+          />
+        </view>
 
-      <!-- 滚动锚点 -->
-      <view id="scroll-bottom" class="scroll-anchor"></view>
-    </scroll-view>
+        <!-- 滚动锚点 -->
+        <view id="scroll-bottom" class="scroll-anchor"></view>
+      </scroll-view>
+    </view>
 
     <!-- 角色信息和工具栏 -->
     <view class="info-toolbar">
@@ -50,18 +56,6 @@
 
       <!-- 右侧：工具按钮 -->
       <view class="action-tools">
-        <!-- 点赞 -->
-        <view class="tool-item" bindtap="handleLike">
-          <text class="tool-icon">👍</text>
-          <text class="tool-count">{{character.likeCount || 0}}</text>
-        </view>
-
-        <!-- 历史消息 -->
-        <view class="tool-item" bindtap="handleViewHistory">
-          <text class="tool-icon">💬</text>
-          <text class="tool-count">{{character.messageCount || 0}}</text>
-        </view>
-
         <!-- 收藏 -->
         <view
           class="tool-item favorite-tool {{character.isFavorite ? 'active' : ''}}"
@@ -76,6 +70,12 @@
           bindtap="handlePinToHome"
         >
           <text class="tool-icon">{{isPinned ? '★' : '☆'}}</text>
+        </view>
+        <view
+          class="tool-item history-tool {{showHistory ? 'active' : ''}}"
+          bindtap="toggleHistory"
+        >
+          <text class="tool-icon">🕘</text>
         </view>
       </view>
     </view>
@@ -140,9 +140,12 @@ createComponent({
     inputText: '',
     loading: false,
     sending: false,
-    scrollToView: '',
     isPinned: false,
-    hasStartedChat: false // 是否已开始聊天
+    hasStartedChat: false, // 是否已开始聊天
+    showHistory: false,
+    scrollWithAnimation: true,
+    scrollTop: 0,
+    historyReady: true
   },
 
   lifetimes: {
@@ -221,15 +224,16 @@ createComponent({
 
         // 使用后端返回的消息列表
         if (conversation.messages && conversation.messages.length > 0) {
-          this.messages = conversation.messages.map((msg: any) => ({
+          this.updateMessages(conversation.messages.map((msg: any) => ({
             id: msg.id,
             conversationId: this.conversationId,
             role: msg.role,
             content: msg.content,
             tokens: null,
             createdAt: msg.createdAt
-          }))
-          this.hasStartedChat = true
+          })))
+        } else {
+          this.updateMessages([])
         }
 
         this.loading = false
@@ -249,8 +253,7 @@ createComponent({
         const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId)
 
         // 保存消息列表
-        this.messages = response.messages || []
-        this.hasStartedChat = this.messages.length > 0
+        this.updateMessages(response.messages || [])
 
         this.loading = false
         this.scrollToBottom()
@@ -285,10 +288,9 @@ createComponent({
         createdAt: new Date().toISOString()
       }
 
-      this.messages = [...this.messages, userMessage]
+      this.updateMessages([...this.messages, userMessage])
       this.inputText = ''
       this.sending = true
-      this.hasStartedChat = true
       this.scrollToBottom()
 
       try {
@@ -296,7 +298,7 @@ createComponent({
         const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
 
         // 3. 将助手消息添加到列表
-        this.messages = [...this.messages, response.assistantMessage]
+        this.updateMessages([...this.messages, response.assistantMessage])
 
         this.scrollToBottom()
 
@@ -312,10 +314,34 @@ createComponent({
       }
     },
 
-    // 滚动到底部
-    scrollToBottom() {
+    toggleHistory() {
+      if (this.showHistory) {
+        this.showHistory = false
+        this.historyReady = true
+        return
+      }
+      this.historyReady = false
+      this.showHistory = true
+      this.scrollWithAnimation = false
       this.$nextTick(() => {
-        this.scrollToView = 'scroll-bottom'
+        this.scrollTop = this.scrollTop + 100000
+        this.historyReady = true
+      })
+    },
+
+    updateMessages(nextMessages: Message[]) {
+      this.messages = nextMessages
+      this.hasStartedChat = this.messages.length > 0
+      if (this.showHistory) {
+        this.scrollToBottom()
+      }
+    },
+
+    // 滚动到底部
+    scrollToBottom(animate = true) {
+      this.$nextTick(() => {
+        this.scrollWithAnimation = animate
+        this.scrollTop = this.scrollTop + 100000
       })
     },
 
@@ -419,8 +445,8 @@ createComponent({
 .content-card
   position relative
   z-index 3
-  width 100%
-  padding 0 32rpx
+  width 100vw
+  padding 0rpx
   margin-bottom 40rpx
 
   // 介绍部分
@@ -460,12 +486,38 @@ createComponent({
       line-height 1.6
       display block
 
+  .chat-state
+    display flex
+    flex-direction column
+
+  .empty-preview
+    padding 16rpx 32rpx
+    color rgba(255, 255, 255, 0.7)
+    font-size 24rpx
+
   // 消息列表
   .message-list
-    height 400rpx
+    height 65vh
     padding 32rpx 0
     margin-bottom 20rpx
     overflow-y auto
+
+    &.is-preparing
+      visibility hidden
+
+    .message-list-inner
+      min-height 100%
+      display flex
+      flex-direction column
+
+      &.preview-mode
+        justify-content flex-end
+
+        > .message-item
+          display none
+
+        > .message-item:last-child
+          display block
 
     .loading
       text-align center
@@ -482,7 +534,7 @@ createComponent({
     justify-content space-between
     align-items center
     margin-bottom 20rpx
-    padding 0 8rpx
+    padding 0 32rpx
 
     .character-meta
       display flex
@@ -516,6 +568,7 @@ createComponent({
 
         .tool-icon
           font-size 32rpx
+          color: #fff
 
         .tool-count
           font-size 20rpx
@@ -529,6 +582,10 @@ createComponent({
           background rgba(255, 215, 0, 0.25)
           border-color rgba(255, 215, 0, 0.4)
 
+        &.history-tool.active
+          background rgba(255, 255, 255, 0.2)
+          border-color rgba(255, 255, 255, 0.35)
+
   // 输入框部分
   .input-section
     display flex
@@ -538,6 +595,7 @@ createComponent({
     backdrop-filter blur(20rpx)
     border-radius 16rpx
     padding 12rpx 16rpx
+    margin: 0 32rpx
     border 1rpx solid rgba(255, 255, 255, 0.15)
 
     .chat-input

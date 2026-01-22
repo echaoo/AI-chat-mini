@@ -27,15 +27,20 @@
       </view>
 
       <view class="form-item">
-        <text class="label">系统提示词 *</text>
+        <text class="label">角色设定 (JSON格式) *</text>
         <textarea
           class="textarea large"
-          placeholder="请输入系统提示词，定义角色的性格、说话方式等"
+          placeholder='请输入JSON格式的角色设定，例如：
+{
+  "core_summary": "你是一位温柔的AI伴侣...",
+  "personality_traits": ["温柔", "善解人意"],
+  "dialogue_examples": ["你好呀~今天过得怎么样？", "别担心，我一直都在"]
+}'
           value="{{form.systemPrompt}}"
           bindinput="handleSystemPromptInput"
           maxlength="2000"
         />
-        <text class="tip">提示词会影响AI的回复风格和性格</text>
+        <text class="tip {{jsonError ? 'error' : ''}}">{{jsonError || '请输入符合要求的JSON格式角色设定'}}</text>
       </view>
 
       <view class="form-item">
@@ -158,7 +163,8 @@ createPage({
       companion: false
     },
     submitting: false,
-    canSubmit: false
+    canSubmit: false,
+    jsonError: '' // JSON 验证错误信息
   },
 
   onLoad() {
@@ -180,10 +186,48 @@ createPage({
     },
 
     handleSystemPromptInput(e: any) {
+      const value = e.detail.value
       this.setData({
-        'form.systemPrompt': e.detail.value
+        'form.systemPrompt': value
       })
+
+      // 验证 JSON 格式
+      this.validateJSON(value)
       this.checkCanSubmit()
+    },
+
+    validateJSON(jsonStr: string) {
+      if (!jsonStr.trim()) {
+        this.setData({ jsonError: '' })
+        return false
+      }
+
+      try {
+        const profile = JSON.parse(jsonStr)
+
+        // 验证必填字段
+        if (!profile.core_summary || typeof profile.core_summary !== 'string') {
+          this.setData({ jsonError: '缺少必填字段: core_summary (核心摘要)' })
+          return false
+        }
+
+        if (!Array.isArray(profile.dialogue_examples) || profile.dialogue_examples.length === 0) {
+          this.setData({ jsonError: '缺少必填字段: dialogue_examples (对话示例数组)' })
+          return false
+        }
+
+        // 验证核心摘要长度
+        if (profile.core_summary.length > 200) {
+          this.setData({ jsonError: 'core_summary 不能超过200字' })
+          return false
+        }
+
+        this.setData({ jsonError: '' })
+        return true
+      } catch (error) {
+        this.setData({ jsonError: 'JSON 格式错误，请检查格式是否正确' })
+        return false
+      }
     },
 
     handleGreetingInput(e: any) {
@@ -200,8 +244,9 @@ createPage({
 
     checkCanSubmit() {
       const { name, systemPrompt } = this.form
+      const isJsonValid = this.validateJSON(systemPrompt)
       this.setData({
-        canSubmit: name.trim() !== '' && systemPrompt.trim() !== ''
+        canSubmit: name.trim() !== '' && systemPrompt.trim() !== '' && isJsonValid
       })
     },
 
@@ -291,8 +336,18 @@ createPage({
 
       if (!systemPrompt.trim()) {
         mpx.showToast({
-          title: '请输入系统提示词',
+          title: '请输入角色设定',
           icon: 'none'
+        })
+        return
+      }
+
+      // 验证 JSON 格式
+      if (!this.validateJSON(systemPrompt)) {
+        mpx.showToast({
+          title: this.jsonError || 'JSON格式错误',
+          icon: 'none',
+          duration: 2000
         })
         return
       }
@@ -394,6 +449,9 @@ createPage({
     margin-top 12rpx
     font-size 24rpx
     color #999
+
+    &.error
+      color #ff4444
 
 // 背景图上传样式
 .background-list

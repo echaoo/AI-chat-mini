@@ -110,6 +110,15 @@ export interface UserInfo {
   createdAt: string
 }
 
+// 角色设定结构化数据（推荐方案）
+export interface CharacterProfile {
+  core_summary: string // 核心摘要，不超过200字
+  personality_traits: string[] // 性格特质数组
+  background_story?: string // 背景故事（可选）
+  dialogue_examples: string[] // 对话示例数组，2-3个
+  other_info?: string // 其他信息（可选）
+}
+
 // API 响应
 export interface ApiResponse<T = any> {
   code?: number

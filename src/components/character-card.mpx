@@ -1,6 +1,5 @@
 <template>
   <view class="character-card" bindtap="handleTap">
-    <image class="avatar" src="{{character.avatarUrl || '/static/images/default-avatar.png'}}" mode="aspectFill" />
     <view class="info">
       <text class="name">{{character.name}}</text>
       <text class="description">{{character.description || '暂无描述'}}</text>

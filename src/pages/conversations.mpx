@@ -29,7 +29,7 @@
         >
           <image
             class="avatar"
-            src="{{item.character.avatarUrl || '/static/images/default-avatar.png'}}"
+            src="{{item.character.avatarUrl}}"
             mode="aspectFill"
           />
           <view class="info">

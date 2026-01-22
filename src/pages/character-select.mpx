@@ -17,7 +17,7 @@
         <!-- 角色背景图 -->
         <image
           class="bg-image"
-          src="{{item.avatarUrl || '/assets/default-avatar.png'}}"
+          src="{{item.avatarUrl}}"
           mode="aspectFill"
         />
 
