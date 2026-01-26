@@ -139,8 +139,8 @@ export const conversationApi = {
   /**
    * 获取对话消息历史
    */
-  getConversationMessages(conversationId: number): Promise<ConversationMessagesResponse> {
-    return get<ConversationMessagesResponse>(`/companion/conversations/${conversationId}/messages`)
+  getConversationMessages(conversationId: number, page = 1, pageSize = 50): Promise<ConversationMessagesResponse> {
+    return get<ConversationMessagesResponse>(`/companion/conversations/${conversationId}/messages?page=${page}&pageSize=${pageSize}`)
   },
 
   /**

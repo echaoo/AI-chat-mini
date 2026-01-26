@@ -61,6 +61,9 @@ import type { Character, Message, CreateConversationResponse, ConversationMessag
 const GREETING_CACHE_KEY = 'greeting_cache'
 const CONVERSATION_CACHE_KEY = 'last_conversation_id' // 用于首页预取问候语
 const HOME_CHARACTER_CACHE_KEY = 'home_character' // 首页固定角色缓存
+const LAST_CONVERSATION_CHARACTER_KEY = 'last_conversation_character'
+const MESSAGE_CACHE_PREFIX = 'conversation_messages_'
+const HISTORY_PAGE_SIZE = 50
 
 createPage({
   data: {
@@ -113,6 +116,13 @@ createPage({
     if (this.conversationId) {
       try {
         wx.setStorageSync(CONVERSATION_CACHE_KEY, this.conversationId)
+        if (this.character) {
+          wx.setStorageSync(LAST_CONVERSATION_CHARACTER_KEY, {
+            conversationId: this.conversationId,
+            character: { ...this.character },
+            timestamp: Date.now()
+          })
+        }
       } catch (e) {
         // 忽略错误
       }
@@ -155,6 +165,7 @@ createPage({
 
         this.loading = false
         this.checkIfPinned() // 检查是否已固定
+        this.cacheMessages()
         this.scrollToBottom()
       } catch (err: any) {
         wx.showToast({ title: err.message || '初始化失败', icon: 'none' })
@@ -166,9 +177,13 @@ createPage({
     async loadExistingConversation() {
       try {
         this.loading = true
+        const cachedMessages = this.getCachedMessages(this.conversationId)
+        if (cachedMessages.length > 0) {
+          this.messages = cachedMessages
+        }
 
         // 加载对话信息和消息历史
-        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId)
+        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId, 1, HISTORY_PAGE_SIZE)
 
         // 保存角色信息
         this.character = {
@@ -191,6 +206,7 @@ createPage({
 
         // 保存消息列表
         this.messages = response.messages || []
+        this.cacheMessages()
 
         this.loading = false
         this.checkIfPinned() // 检查是否已固定
@@ -220,6 +236,7 @@ createPage({
       }
 
       this.messages = [...this.messages, userMessage]
+      this.cacheMessages()
       this.inputText = ''
       this.sending = true
       this.scrollToBottom()
@@ -230,6 +247,7 @@ createPage({
 
         // 3. 将助手消息添加到列表
         this.messages = [...this.messages, response.assistantMessage]
+        this.cacheMessages()
 
         this.scrollToBottom()
       } catch (err: any) {
@@ -246,6 +264,27 @@ createPage({
       this.$nextTick(() => {
         this.scrollToView = 'scroll-bottom'
       })
+    },
+
+    cacheMessages() {
+      if (!this.conversationId) return
+      try {
+        const cacheKey = `${MESSAGE_CACHE_PREFIX}${this.conversationId}`
+        const sliced = this.messages.slice(-HISTORY_PAGE_SIZE)
+        wx.setStorageSync(cacheKey, sliced)
+      } catch (e) {
+        // 忽略错误
+      }
+    },
+
+    getCachedMessages(conversationId: number) {
+      try {
+        const cacheKey = `${MESSAGE_CACHE_PREFIX}${conversationId}`
+        const cached = wx.getStorageSync(cacheKey)
+        return Array.isArray(cached) ? cached : []
+      } catch (e) {
+        return []
+      }
     },
 
     /**
@@ -279,12 +318,7 @@ createPage({
           const cacheData = {
             characterId: this.characterId,
             conversationId: this.conversationId || null,
-            character: {
-              id: this.character.id,
-              name: this.character.name,
-              avatarUrl: this.character.avatarUrl,
-              description: this.character.description
-            },
+            character: { ...this.character },
             timestamp: Date.now()
           }
           wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)

@@ -21,8 +21,10 @@
         scroll-y
         class="message-list {{!historyReady ? 'is-preparing' : ''}}"
         scroll-top="{{scrollTop}}"
+        scroll-into-view="{{scrollIntoView}}"
         scroll-with-animation="{{scrollWithAnimation}}"
         show-scrollbar="{{false}}"
+        bindscroll="handleScroll"
       >
         <view wx:if="{{loading}}" class="loading">
           <text>加载中...</text>
@@ -32,10 +34,14 @@
           <view wx:if="{{!loading && messages.length === 0}}" class="empty-preview">
             <text>暂无历史消息</text>
           </view>
+          <view wx:if="{{showHistory && hasMoreHistory}}" class="load-more" bindtap="handleLoadMoreHistory">
+            <text>{{isLoadingHistory ? '加载中...' : '查看更早消息'}}</text>
+          </view>
           <message-bubble
             wx:for="{{messages}}"
             wx:key="id"
             id="msg-{{item.id}}"
+            data-msg-id="{{item.id}}"
             class="message-item"
             message="{{item}}"
           />
@@ -101,6 +107,7 @@
       </button>
     </view>
   </view>
+
 </template>
 
 <script lang="ts">
@@ -111,6 +118,9 @@ import type { Character, Message, CreateConversationResponse, ConversationMessag
 const GREETING_CACHE_KEY = 'greeting_cache'
 const CONVERSATION_CACHE_KEY = 'last_conversation_id'
 const HOME_CHARACTER_CACHE_KEY = 'home_character'
+const LAST_CONVERSATION_CHARACTER_KEY = 'last_conversation_character'
+const MESSAGE_CACHE_PREFIX = 'conversation_messages_'
+const HISTORY_PAGE_SIZE = 10
 
 // 每 N 条消息触发一次摘要更新（20条 = 10轮对话）
 const MEMORY_UPDATE_MESSAGE_INTERVAL = 20
@@ -145,7 +155,13 @@ createComponent({
     showHistory: false,
     scrollWithAnimation: true,
     scrollTop: 0,
-    historyReady: true
+    historyReady: true,
+    historyPage: 1,
+    pageSize: HISTORY_PAGE_SIZE,
+    hasMoreHistory: false,
+    isLoadingHistory: false,
+    currentScrollTop: 0,
+    scrollIntoView: ''
   },
 
   lifetimes: {
@@ -165,6 +181,13 @@ createComponent({
       if (this.conversationId) {
         try {
           wx.setStorageSync(CONVERSATION_CACHE_KEY, this.conversationId)
+          if (this.character) {
+            wx.setStorageSync(LAST_CONVERSATION_CHARACTER_KEY, {
+              conversationId: this.conversationId,
+              character: { ...this.character },
+              timestamp: Date.now()
+            })
+          }
         } catch (e) {
           // 忽略错误
         }
@@ -235,6 +258,8 @@ createComponent({
         } else {
           this.updateMessages([])
         }
+        this.historyPage = 1
+        this.hasMoreHistory = false
 
         this.loading = false
         this.scrollToBottom()
@@ -249,11 +274,18 @@ createComponent({
       try {
         this.loading = true
 
+        const cachedMessages = this.getCachedMessages(this.conversationId)
+        if (cachedMessages.length > 0) {
+          this.updateMessages(cachedMessages)
+        }
+
         // 加载对话信息和消息历史
-        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId)
+        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId, 1, this.pageSize)
 
         // 保存消息列表
         this.updateMessages(response.messages || [])
+        this.historyPage = 1
+        this.hasMoreHistory = (response.messages || []).length === this.pageSize
 
         this.loading = false
         this.scrollToBottom()
@@ -318,6 +350,10 @@ createComponent({
       if (this.showHistory) {
         this.showHistory = false
         this.historyReady = true
+        this.historyPage = 1
+        if (this.messages.length > this.pageSize) {
+          this.updateMessages(this.messages.slice(-this.pageSize))
+        }
         return
       }
       this.historyReady = false
@@ -332,8 +368,69 @@ createComponent({
     updateMessages(nextMessages: Message[]) {
       this.messages = nextMessages
       this.hasStartedChat = this.messages.length > 0
+      this.cacheMessages()
       if (this.showHistory) {
         this.scrollToBottom()
+      }
+    },
+
+    async handleLoadMoreHistory() {
+      if (!this.hasMoreHistory || this.isLoadingHistory) return
+      this.isLoadingHistory = true
+      const nextPage = this.historyPage + 1
+      try {
+        const anchorId = await this.getFirstVisibleMessageId()
+        const beforeMetrics = anchorId ? null : await this.getMessageListMetrics()
+        const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId, nextPage, this.pageSize)
+        const nextMessages = response.messages || []
+        if (nextMessages.length > 0) {
+          this.scrollWithAnimation = false
+          const payload: Record<string, any> = {
+            messages: [...nextMessages, ...this.messages],
+            historyPage: nextPage
+          }
+          if (anchorId) {
+            payload.scrollIntoView = anchorId
+          }
+          this.batchUpdate(payload)
+          if (anchorId) {
+            await new Promise<void>((resolve) => this.$nextTick(resolve))
+            this.batchUpdate({ scrollIntoView: '' })
+          } else if (beforeMetrics) {
+            await new Promise<void>((resolve) => this.$nextTick(resolve))
+            const afterMetrics = await this.getMessageListMetrics()
+            const deltaHeight = afterMetrics.scrollHeight - beforeMetrics.scrollHeight
+            if (deltaHeight > 0) {
+              this.scrollTop = beforeMetrics.scrollTop + deltaHeight
+            }
+          }
+        }
+        this.hasMoreHistory = nextMessages.length === this.pageSize
+      } catch (err: any) {
+        wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+      } finally {
+        this.isLoadingHistory = false
+      }
+    },
+
+    cacheMessages() {
+      if (!this.conversationId) return
+      try {
+        const cacheKey = `${MESSAGE_CACHE_PREFIX}${this.conversationId}`
+        const sliced = this.messages.slice(-HISTORY_PAGE_SIZE)
+        wx.setStorageSync(cacheKey, sliced)
+      } catch (e) {
+        // 忽略错误
+      }
+    },
+
+    getCachedMessages(conversationId: number) {
+      try {
+        const cacheKey = `${MESSAGE_CACHE_PREFIX}${conversationId}`
+        const cached = wx.getStorageSync(cacheKey)
+        return Array.isArray(cached) ? cached : []
+      } catch (e) {
+        return []
       }
     },
 
@@ -342,6 +439,59 @@ createComponent({
       this.$nextTick(() => {
         this.scrollWithAnimation = animate
         this.scrollTop = this.scrollTop + 100000
+      })
+    },
+
+    handleScroll(e: any) {
+      this.currentScrollTop = e.detail.scrollTop || 0
+    },
+
+    getMessageListMetrics() {
+      return new Promise<{ scrollTop: number; scrollHeight: number }>((resolve) => {
+        wx.createSelectorQuery()
+          .in(this)
+          .select('.message-list')
+          .fields({ scrollOffset: true, scrollHeight: true })
+          .exec((res: any) => {
+            const metrics = res && res[0] ? res[0] : {}
+            resolve({
+              scrollTop: typeof metrics.scrollTop === 'number' ? metrics.scrollTop : this.currentScrollTop,
+              scrollHeight: typeof metrics.scrollHeight === 'number' ? metrics.scrollHeight : 0
+            })
+          })
+      })
+    },
+
+    getFirstVisibleMessageId() {
+      return new Promise<string>((resolve) => {
+        wx.createSelectorQuery()
+          .in(this)
+          .select('.message-list')
+          .boundingClientRect()
+          .selectAll('.message-item')
+          .fields({ rect: true, dataset: true })
+          .exec((res: any) => {
+            const listRect = res && res[0] ? res[0] : null
+            const items = res && res[1] ? res[1] : []
+            if (!listRect || !items.length) {
+              resolve('')
+              return
+            }
+            const threshold = listRect.top + 1
+            const firstVisible = items.find((item: any) => item?.rect && item.rect.bottom > threshold)
+            const msgId = firstVisible?.dataset?.msgId
+            resolve(msgId ? `msg-${msgId}` : '')
+          })
+      })
+    },
+
+    batchUpdate(payload: Record<string, any>) {
+      if (typeof (this as any).setData === 'function') {
+        ;(this as any).setData(payload)
+        return
+      }
+      Object.keys(payload).forEach((key) => {
+        ;(this as any)[key] = payload[key]
       })
     },
 
@@ -372,12 +522,7 @@ createComponent({
           const cacheData = {
             characterId: this.character.id,
             conversationId: this.conversationId || null,
-            character: {
-              id: this.character.id,
-              name: this.character.name,
-              avatarUrl: this.character.avatarUrl,
-              description: this.character.description
-            },
+            character: { ...this.character },
             timestamp: Date.now()
           }
           wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
@@ -505,20 +650,6 @@ createComponent({
     &.is-preparing
       visibility hidden
 
-    .message-list-inner
-      min-height 100%
-      display flex
-      flex-direction column
-
-      &.preview-mode
-        justify-content flex-end
-
-        > .message-item
-          display none
-
-        > .message-item:last-child
-          display block
-
     .loading
       text-align center
       padding 100rpx 0
@@ -527,6 +658,29 @@ createComponent({
 
     .scroll-anchor
       height 1rpx
+
+  .message-list-inner
+    min-height 100%
+    display flex
+    flex-direction column
+
+    &.preview-mode
+      justify-content flex-end
+      
+      > .message-item
+        display none
+
+      > .message-item:last-child
+        display flex
+
+    .load-more
+      align-self center
+      padding 12rpx 24rpx
+      margin-bottom 12rpx
+      border-radius 999rpx
+      border 1rpx solid rgba(255, 255, 255, 0.2)
+      color rgba(255, 255, 255, 0.85)
+      font-size 24rpx
 
   // 信息和工具栏
   .info-toolbar
