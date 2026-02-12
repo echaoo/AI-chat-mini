@@ -281,7 +281,6 @@ createPage({
   height 100vh
   position relative
   overflow hidden
-  background-image url('../assets/qiyu.jpg')
   background-size cover
   background-position center
 

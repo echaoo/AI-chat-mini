@@ -43,7 +43,13 @@
             id="msg-{{item.id}}"
             data-msg-id="{{item.id}}"
             class="message-item"
+            index="{{index}}"
             message="{{item}}"
+            show-rollback="{{index !== messages.length - 1}}"
+            show-regenerate="{{index === messages.length - 1 && item.role === 'assistant'}}"
+            bindmessageLongPress="handleMessageLongPress"
+            bindmessageRollback="handleMessageRollbackTap"
+            bindmessageRegenerate="handleMessageRegenerateTap"
           />
         </view>
 
@@ -300,6 +306,160 @@ createComponent({
       this.inputText = e.detail.value
     },
 
+    handleMessageLongPress(e: any) {
+      const detail = e?.detail || {}
+      const message = detail.message as Message | undefined
+      const index = typeof detail.index === 'number' ? detail.index : -1
+      if (!message) return
+
+      const canRegenerate = this.canRegenerate(message, index)
+      const canRollback = this.canRollback(message, index)
+      const itemList: string[] = []
+      if (canRollback) itemList.push('回溯')
+      if (canRegenerate) itemList.push('重新生成')
+      if (itemList.length === 0) return
+      wx.showActionSheet({
+        itemList,
+        success: (res) => {
+          const action = itemList[res.tapIndex]
+          if (action === '回溯') {
+            this.handleRollbackMessage(message, index)
+            return
+          }
+          if (action === '重新生成') {
+            this.handleRegenerateMessage(message, index)
+          }
+        }
+      })
+    },
+
+    handleMessageRollbackTap(e: any) {
+      const detail = e?.detail || {}
+      const message = detail.message as Message | undefined
+      const index = typeof detail.index === 'number' ? detail.index : -1
+      if (!message) return
+      this.handleRollbackMessage(message, index)
+    },
+
+    handleMessageRegenerateTap(e: any) {
+      const detail = e?.detail || {}
+      const message = detail.message as Message | undefined
+      const index = typeof detail.index === 'number' ? detail.index : -1
+      if (!message) return
+      if (!this.canRegenerate(message, index)) {
+        wx.showToast({ title: '仅支持重新生成最新回复', icon: 'none' })
+        return
+      }
+      this.handleRegenerateMessage(message, index)
+    },
+
+    async handleRegenerateMessage(message: Message, index: number) {
+      if (this.sending) return
+      const content = this.getRegenerateContent(message, index)
+      if (!content) {
+        wx.showToast({ title: '未找到可重新生成的用户消息', icon: 'none' })
+        return
+      }
+      this.sending = true
+      try {
+        const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
+        const nextMessages = [...this.messages]
+        nextMessages[index] = response.assistantMessage
+        this.updateMessages(nextMessages)
+        this.scrollToBottom()
+      } catch (err: any) {
+        wx.showToast({ title: err.message || '重新生成失败', icon: 'none' })
+      } finally {
+        this.sending = false
+      }
+    },
+
+    canRegenerate(message: Message, index: number): boolean {
+      if (message.role !== 'assistant') return false
+      if (index !== this.messages.length - 1) return false
+      return Boolean(this.getRegenerateContent(message, index))
+    },
+
+    canRollback(message: Message, index: number): boolean {
+      if (index !== this.messages.length - 1) return true
+      return message.role !== 'assistant'
+    },
+
+    getRegenerateContent(message: Message, index: number): string {
+      if (message.role === 'user') {
+        return message.content || ''
+      }
+      for (let i = index - 1; i >= 0; i -= 1) {
+        const candidate = this.messages[i]
+        if (candidate?.role === 'user') {
+          return candidate.content || ''
+        }
+      }
+      return ''
+    },
+
+    handleRollbackMessage(message: Message, index?: number) {
+      if (!this.conversationId) {
+        wx.showToast({ title: '对话未初始化', icon: 'none' })
+        return
+      }
+      const localSnapshot = [...this.messages]
+      const localIndex = typeof index === 'number'
+        ? index
+        : localSnapshot.findIndex((item) => item.id === message.id)
+      if (localIndex < 0) return
+      if (message.role === 'assistant') {
+        if (!this.canRollback(message, localIndex)) {
+          wx.showToast({ title: '无法回溯最新回复', icon: 'none' })
+          return
+        }
+        const nextMessage = localSnapshot[localIndex + 1]
+        const rollbackMessageId = nextMessage ? nextMessage.id : message.id
+        wx.showModal({
+          title: '确认回溯',
+          content: '确认回溯到该回复？',
+          success: async (res) => {
+            if (!res.confirm) return
+            try {
+              await conversationApi.rollbackConversation(this.conversationId, rollbackMessageId)
+              const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId, 1, this.pageSize)
+              const nextMessages = response.messages || []
+              const index = nextMessages.findIndex((item) => item.id === message.id)
+              if (index >= 0) {
+                this.updateMessages(nextMessages.slice(0, index + 1))
+              } else {
+                this.updateMessages(localIndex >= 0 ? localSnapshot.slice(0, localIndex + 1) : nextMessages)
+              }
+              this.hasMoreHistory = (response.messages || []).length === this.pageSize
+              this.historyPage = 1
+              this.scrollToBottom()
+            } catch (err: any) {
+              wx.showToast({ title: err.message || '回溯失败', icon: 'none' })
+            }
+          }
+        })
+        return
+      }
+      wx.showModal({
+        title: '确认回溯',
+        content: '确认从词条消息开始回溯？',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await conversationApi.rollbackConversation(this.conversationId, message.id)
+            const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(this.conversationId, 1, this.pageSize)
+            this.updateMessages(response.messages || [])
+            this.hasMoreHistory = (response.messages || []).length === this.pageSize
+            this.historyPage = 1
+            this.inputText = message.content || ''
+            this.scrollToBottom()
+          } catch (err: any) {
+            wx.showToast({ title: err.message || '回溯失败', icon: 'none' })
+          }
+        }
+      })
+    },
+
     // 发送消息
     async handleSend() {
       const content = this.inputText.trim()
@@ -451,7 +611,7 @@ createComponent({
         wx.createSelectorQuery()
           .in(this)
           .select('.message-list')
-          .fields({ scrollOffset: true, scrollHeight: true })
+          .fields({ scrollOffset: true, scrollHeight: true } as any)
           .exec((res: any) => {
             const metrics = res && res[0] ? res[0] : {}
             resolve({

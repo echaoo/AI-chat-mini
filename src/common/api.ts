@@ -169,5 +169,12 @@ export const conversationApi = {
     memorySummary?: string
   }> {
     return post(`/companion/conversations/${conversationId}/memory`, {})
+  },
+
+  /**
+   * 回溯对话到指定消息
+   */
+  rollbackConversation(conversationId: number, messageId: number): Promise<void> {
+    return post(`/companion/conversations/${conversationId}/rollback`, { messageId })
   }
 }

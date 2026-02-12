@@ -1,8 +1,15 @@
 <template>
-  <view class="message-bubble {{message.role === 'user' ? 'user-message' : 'assistant-message'}}">
+  <view
+    class="message-bubble {{message.role === 'user' ? 'user-message' : 'assistant-message'}}"
+    catchlongpress="handleLongPress"
+  >
     <view class="bubble">
       <text class="content">{{message.content}}</text>
       <text class="time">{{formatTime(message.createdAt)}}</text>
+    </view>
+    <view class="actions">
+      <button wx:if="{{showRollback}}" class="action-btn" bindtap="handleRollbackTap">回溯</button>
+      <button wx:if="{{showRegenerate}}" class="action-btn" bindtap="handleRegenerateTap">重新生成</button>
     </view>
   </view>
 </template>
@@ -15,10 +22,40 @@ createComponent({
     message: {
       type: Object,
       value: {}
+    },
+    index: {
+      type: Number,
+      value: 0
+    },
+    showRegenerate: {
+      type: Boolean,
+      value: true
+    },
+    showRollback: {
+      type: Boolean,
+      value: true
     }
   },
 
   methods: {
+    handleLongPress() {
+      this.triggerEvent('messageLongPress', {
+        message: this.message,
+        index: this.index
+      })
+    },
+    handleRollbackTap() {
+      this.triggerEvent('messageRollback', {
+        message: this.message,
+        index: this.index
+      })
+    },
+    handleRegenerateTap() {
+      this.triggerEvent('messageRegenerate', {
+        message: this.message,
+        index: this.index
+      })
+    },
     formatTime(time: string): string {
       const date = new Date(time)
       const hours = date.getHours().toString().padStart(2, '0')
@@ -32,8 +69,11 @@ createComponent({
 <style lang="stylus">
 .message-bubble
   display flex
+  flex-direction column
   margin-bottom 32rpx
   padding 0 32rpx
+  box-sizing border-box
+  width 100%
 
   .bubble
     max-width 500rpx
@@ -52,8 +92,32 @@ createComponent({
       color #999
       margin-top 8rpx
 
+  .actions
+    display flex
+    gap 16rpx
+    margin-top 12rpx
+
+    .action-btn
+      height 48rpx
+      line-height 48rpx
+      padding 0 20rpx
+      background rgba(0, 0, 0, 0.06)
+      color #666
+      border-radius 999rpx
+      font-size 24rpx
+      border none
+      display flex
+      align-items center
+      justify-content center
+      transition transform 0.2s
+
+      &:active
+        transform scale(0.96)
+
 .assistant-message
+  align-self flex-start
   justify-content flex-start
+  align-items flex-start
 
   .bubble
     background #fff
@@ -63,7 +127,9 @@ createComponent({
       color #333
 
 .user-message
+  align-self flex-end
   justify-content flex-end
+  align-items flex-end
 
   .bubble
     background #667eea
