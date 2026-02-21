@@ -18,8 +18,6 @@
           id="msg-{{item.id}}"
           index="{{index}}"
           message="{{item}}"
-          show-rollback="{{index !== messages.length - 1}}"
-          show-regenerate="{{index === messages.length - 1 && item.role === 'assistant'}}"
           bindmessageLongPress="handleMessageLongPress"
           bindmessageRollback="handleMessageRollbackTap"
           bindmessageRegenerate="handleMessageRegenerateTap"
@@ -64,6 +62,8 @@ import { createPage } from '@mpxjs/core'
 import { characterApi, conversationApi } from '../common/api'
 import type { Character, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
 
+type UIMessage = Message & { isLoading?: boolean }
+
 const GREETING_CACHE_KEY = 'greeting_cache'
 const CONVERSATION_CACHE_KEY = 'last_conversation_id' // 用于首页预取问候语
 const HOME_CHARACTER_CACHE_KEY = 'home_character' // 首页固定角色缓存
@@ -76,7 +76,7 @@ createPage({
     characterId: 0,
     conversationId: 0,
     character: null as Character | null,
-    messages: [] as Message[],
+    messages: [] as UIMessage[],
     inputText: '',
     loading: true,
     sending: false,
@@ -281,6 +281,10 @@ createPage({
         wx.showToast({ title: '未找到可重新生成的用户消息', icon: 'none' })
         return
       }
+      const originalMessage = { ...this.messages[index] }
+      const loadingMessages = [...this.messages]
+      loadingMessages[index] = { ...originalMessage, isLoading: true }
+      this.messages = loadingMessages
       this.sending = true
       try {
         const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
@@ -290,6 +294,9 @@ createPage({
         this.cacheMessages()
         this.scrollToBottom()
       } catch (err: any) {
+        const rollbackMessages = [...this.messages]
+        rollbackMessages[index] = originalMessage
+        this.messages = rollbackMessages
         wx.showToast({ title: err.message || '重新生成失败', icon: 'none' })
       } finally {
         this.sending = false
@@ -393,8 +400,17 @@ createPage({
         tokens: null,
         createdAt: new Date().toISOString()
       }
+      const pendingAssistantMessage: UIMessage = {
+        id: Date.now() + 1,
+        conversationId: this.conversationId,
+        role: 'assistant',
+        content: '',
+        tokens: null,
+        createdAt: new Date().toISOString(),
+        isLoading: true
+      }
 
-      this.messages = [...this.messages, userMessage]
+      this.messages = [...this.messages, userMessage, pendingAssistantMessage]
       this.cacheMessages()
       this.inputText = ''
       this.sending = true
@@ -405,15 +421,21 @@ createPage({
         const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
 
         // 3. 将助手消息添加到列表
-        this.messages = [...this.messages, response.assistantMessage]
+        const messagesCopy = [...this.messages]
+        const loadingIndex = messagesCopy.findIndex((item) => item.isLoading)
+        if (loadingIndex >= 0) {
+          messagesCopy[loadingIndex] = response.assistantMessage
+        } else {
+          messagesCopy.push(response.assistantMessage)
+        }
+        this.messages = messagesCopy
         this.cacheMessages()
 
         this.scrollToBottom()
       } catch (err: any) {
         wx.showToast({ title: err.message || '发送失败', icon: 'none' })
-
-        // 可选: 发送失败时，可以考虑移除刚才添加的用户消息或标记为失败
-        // this.messages.pop()
+        this.messages = this.messages.filter((item) => !item.isLoading)
+        this.cacheMessages()
       } finally {
         this.sending = false
       }

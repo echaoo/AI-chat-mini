@@ -4,12 +4,15 @@
     catchlongpress="handleLongPress"
   >
     <view class="bubble">
-      <text class="content">{{message.content}}</text>
-      <text class="time">{{formatTime(message.createdAt)}}</text>
-    </view>
-    <view class="actions">
-      <button wx:if="{{showRollback}}" class="action-btn" bindtap="handleRollbackTap">回溯</button>
-      <button wx:if="{{showRegenerate}}" class="action-btn" bindtap="handleRegenerateTap">重新生成</button>
+      <view wx:if="{{message.isLoading}}" class="loading">
+        <view class="loading-dots">
+          <view class="dot"></view>
+          <view class="dot"></view>
+          <view class="dot"></view>
+        </view>
+      </view>
+      <text wx:else class="content">{{message.content}}</text>
+      <text wx:if="{{!message.isLoading}}" class="time">{{formatTime(message.createdAt)}}</text>
     </view>
   </view>
 </template>
@@ -26,14 +29,6 @@ createComponent({
     index: {
       type: Number,
       value: 0
-    },
-    showRegenerate: {
-      type: Boolean,
-      value: true
-    },
-    showRollback: {
-      type: Boolean,
-      value: true
     }
   },
 
@@ -67,6 +62,7 @@ createComponent({
 </script>
 
 <style lang="stylus">
+vendors=official
 .message-bubble
   display flex
   flex-direction column
@@ -92,27 +88,32 @@ createComponent({
       color #999
       margin-top 8rpx
 
-  .actions
+  .loading
     display flex
-    gap 16rpx
-    margin-top 12rpx
+    align-items center
+    gap 12rpx
 
-    .action-btn
-      height 48rpx
-      line-height 48rpx
-      padding 0 20rpx
-      background rgba(0, 0, 0, 0.06)
-      color #666
-      border-radius 999rpx
-      font-size 24rpx
-      border none
-      display flex
-      align-items center
-      justify-content center
-      transition transform 0.2s
+  .loading-dots
+    display flex
+    gap 6rpx
 
-      &:active
-        transform scale(0.96)
+    .dot
+      width 10rpx
+      height 10rpx
+      border-radius 50%
+      background rgba(0, 0, 0, 0.35)
+      animation loading-bounce 1.2s infinite ease-in-out
+      transform scale(0.6)
+
+      &:nth-child(2)
+        animation-delay 0.2s
+
+      &:nth-child(3)
+        animation-delay 0.4s
+
+  .loading-text
+    font-size 24rpx
+    color #999
 
 .assistant-message
   align-self flex-start
@@ -125,6 +126,9 @@ createComponent({
 
     .content
       color #333
+
+    .loading-text
+      color #666
 
 .user-message
   align-self flex-end
@@ -140,6 +144,18 @@ createComponent({
 
     .time
       color rgba(255, 255, 255, 0.7)
+
+    .loading-dots
+      .dot
+        background rgba(255, 255, 255, 0.8)
+
+@keyframes loading-bounce
+  0%, 80%, 100%
+    transform scale(0.4)
+    opacity 0.35
+  40%
+    transform scale(1)
+    opacity 1
 </style>
 
 <script type="application/json">

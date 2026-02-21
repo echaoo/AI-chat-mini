@@ -45,8 +45,6 @@
             class="message-item"
             index="{{index}}"
             message="{{item}}"
-            show-rollback="{{index !== messages.length - 1}}"
-            show-regenerate="{{index === messages.length - 1 && item.role === 'assistant'}}"
             bindmessageLongPress="handleMessageLongPress"
             bindmessageRollback="handleMessageRollbackTap"
             bindmessageRegenerate="handleMessageRegenerateTap"
@@ -121,6 +119,8 @@ import { createComponent } from '@mpxjs/core'
 import { characterApi, conversationApi } from '../common/api'
 import type { Character, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
 
+type UIMessage = Message & { isLoading?: boolean }
+
 const GREETING_CACHE_KEY = 'greeting_cache'
 const CONVERSATION_CACHE_KEY = 'last_conversation_id'
 const HOME_CHARACTER_CACHE_KEY = 'home_character'
@@ -152,7 +152,7 @@ createComponent({
 
   data: {
     conversationId: 0,
-    messages: [] as Message[],
+    messages: [] as UIMessage[],
     inputText: '',
     loading: false,
     sending: false,
@@ -360,6 +360,10 @@ createComponent({
         wx.showToast({ title: '未找到可重新生成的用户消息', icon: 'none' })
         return
       }
+      const originalMessage = { ...this.messages[index] }
+      const loadingMessages = [...this.messages]
+      loadingMessages[index] = { ...originalMessage, isLoading: true }
+      this.updateMessages(loadingMessages)
       this.sending = true
       try {
         const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
@@ -368,6 +372,9 @@ createComponent({
         this.updateMessages(nextMessages)
         this.scrollToBottom()
       } catch (err: any) {
+        const rollbackMessages = [...this.messages]
+        rollbackMessages[index] = originalMessage
+        this.updateMessages(rollbackMessages)
         wx.showToast({ title: err.message || '重新生成失败', icon: 'none' })
       } finally {
         this.sending = false
@@ -479,8 +486,17 @@ createComponent({
         tokens: null,
         createdAt: new Date().toISOString()
       }
+      const pendingAssistantMessage: UIMessage = {
+        id: Date.now() + 1,
+        conversationId: this.conversationId,
+        role: 'assistant',
+        content: '',
+        tokens: null,
+        createdAt: new Date().toISOString(),
+        isLoading: true
+      }
 
-      this.updateMessages([...this.messages, userMessage])
+      this.updateMessages([...this.messages, userMessage, pendingAssistantMessage])
       this.inputText = ''
       this.sending = true
       this.scrollToBottom()
@@ -490,7 +506,14 @@ createComponent({
         const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
 
         // 3. 将助手消息添加到列表
-        this.updateMessages([...this.messages, response.assistantMessage])
+        const messagesCopy = [...this.messages]
+        const loadingIndex = messagesCopy.findIndex((item) => item.isLoading)
+        if (loadingIndex >= 0) {
+          messagesCopy[loadingIndex] = response.assistantMessage
+        } else {
+          messagesCopy.push(response.assistantMessage)
+        }
+        this.updateMessages(messagesCopy)
 
         this.scrollToBottom()
 
@@ -501,6 +524,7 @@ createComponent({
         }
       } catch (err: any) {
         wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+        this.updateMessages(this.messages.filter((item) => !item.isLoading))
       } finally {
         this.sending = false
       }

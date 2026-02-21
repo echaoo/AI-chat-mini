@@ -76,6 +76,7 @@ export interface Message {
   content: string
   tokens: number | null
   createdAt: string
+  isLoading?: boolean
 }
 
 // 获取对话消息响应
