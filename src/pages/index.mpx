@@ -94,6 +94,13 @@ createPage({
      */
     async syncHomeCharacterFromServer() {
       try {
+        // 确保登录完成后再请求
+        const store = require('../common/store').default
+        if (!store.state.token) {
+          console.log('[Home] 等待登录完成...')
+          await store.dispatch('login')
+        }
+
         const serverData = await characterApi.getPinnedCharacter()
 
         // 页面已卸载时不执行

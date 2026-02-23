@@ -218,8 +218,29 @@ createPage({
         this.checkIfPinned() // 检查是否已固定
         this.scrollToBottom()
       } catch (err: any) {
-        wx.showToast({ title: err.message || '加载失败', icon: 'none' })
         this.loading = false
+
+        // 如果是 403 错误，说明对话不属于当前用户
+        if (err.message && err.message.includes('403')) {
+          wx.showModal({
+            title: '提示',
+            content: '此对话不存在或已被删除',
+            showCancel: false,
+            success: () => {
+              // 清除缓存
+              wx.removeStorageSync('last_conversation_id')
+              wx.removeStorageSync('home_character')
+              wx.removeStorageSync('last_conversation_character')
+
+              // 返回首页
+              wx.switchTab({
+                url: '/pages/index'
+              })
+            }
+          })
+        } else {
+          wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+        }
       }
     },
 

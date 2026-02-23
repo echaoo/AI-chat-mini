@@ -1,9 +1,70 @@
 <script lang="ts">
 import mpx, { createApp } from '@mpxjs/core'
 import apiProxy from '@mpxjs/api-proxy'
+import mpxFetch from '@mpxjs/fetch'
+import store from './common/store'
 
+mpx.use(mpxFetch)
 mpx.use(apiProxy, { usePromise: true })
-createApp({})
+
+// 设置全局请求拦截器，统一在 header 中传递 token
+mpx.xfetch.interceptors.request.use(
+  config => {
+    const token = store.state.token
+
+    // 如果有 token，添加到 Authorization header
+    if (token) {
+      config.header = config.header || {}
+      config.header.Authorization = `Bearer ${token}`
+    }
+
+    return config
+  },
+  error => {
+    return Promise.reject(error)
+  }
+)
+
+// 设置全局请求响应拦截器处理token过期
+mpx.xfetch.interceptors.response.use(
+  response => {
+    // 请求成功，检查是否为token过期错误 (code: 101/103 或 status: 401)
+    if (response.data && (response.data.code === 101 || response.data.code === 103 || response.data.status === 401)) {
+      console.log('拦截器检测到token过期，尝试重新登录...', response.data)
+
+      // 异步处理重新登录，不阻塞当前请求返回
+      // @ts-ignore
+      store.dispatch('handleApiError', response).then(handleResult => {
+        if (handleResult.relogin) {
+          console.log('全局拦截器：重新登录成功')
+        } else {
+          console.log('全局拦截器：重新登录失败')
+        }
+      }).catch(error => {
+        console.log('全局拦截器：处理token过期错误失败', error)
+      })
+    }
+
+    return response
+  },
+  error => {
+    // 请求失败
+    console.log('请求失败:', error)
+    return Promise.reject(error)
+  }
+)
+
+createApp({
+  async onLaunch() {
+    // 静默登录
+    try {
+      await store.dispatch('login')
+      console.log('登录成功')
+    } catch (error) {
+      console.error('登录失败:', error)
+    }
+  }
+})
 </script>
 
 <style>

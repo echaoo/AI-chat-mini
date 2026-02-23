@@ -2,7 +2,8 @@
  * 网络请求封装
  */
 import mpx from '@mpxjs/core'
-import { API_BASE_URL, TEST_TOKEN, REQUEST_TIMEOUT } from './config'
+import { API_BASE_URL, REQUEST_TIMEOUT } from './config'
+import store from './store'
 
 interface RequestOptions {
   url: string
@@ -26,7 +27,10 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
 
   // 添加 Token
   if (needAuth) {
-    header['Authorization'] = `Bearer ${TEST_TOKEN}`
+    const token = store.state.token
+    if (token) {
+      header['Authorization'] = `Bearer ${token}`
+    }
   }
 
   const fullUrl = `${API_BASE_URL}${url}`
@@ -49,6 +53,14 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
         return responseData.data
       }
       return responseData
+    } else if (res.statusCode === 401) {
+      // Token 过期或无效，触发重新登录
+      store.dispatch('handleApiError', { data: { status: 401 } })
+      throw new Error('登录已过期')
+    } else if (res.statusCode === 403) {
+      // 无权访问
+      const errorMsg = res.data?.message || '无权访问'
+      throw new Error(`403: ${errorMsg}`)
     } else {
       const errorMsg = res.data?.message || '请求失败'
       throw new Error(errorMsg)

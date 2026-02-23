@@ -3,13 +3,58 @@
  */
 import mpx from '@mpxjs/core'
 import { get, post, del } from './request'
-import { API_BASE_URL, TEST_TOKEN } from './config'
+import { API_BASE_URL } from './config'
+import store from './store'
 import type { Character, Conversation, CreateConversationResponse, Message, CreateCharacterRequest, SendMessageResponse, ConversationMessagesResponse } from './types'
 
 /**
  * 背景图类型
  */
 export type BackgroundType = 'chat' | 'sleep' | 'companion'
+
+/**
+ * 认证相关 API
+ */
+export const authApi = {
+  /**
+   * 微信小程序登录
+   */
+  wechatLogin(data: { code: string; nickName?: string; avatarUrl?: string }): Promise<{
+    token: string
+    user: {
+      id: number
+      name: string
+      avatarUrl: string
+      provider: string
+      points: number
+    }
+  }> {
+    return post('/companion/auth/wechat', data, false)
+  },
+
+  /**
+   * 获取当前用户信息
+   */
+  getMe(): Promise<{
+    id: number
+    name: string
+    avatarUrl: string
+    provider: string
+    phone?: string
+    points: number
+    status: string
+    createdAt: string
+  }> {
+    return get('/companion/auth/me')
+  },
+
+  /**
+   * 绑定手机号
+   */
+  bindPhone(phone: string): Promise<{ success: boolean; phone: string }> {
+    return post('/companion/auth/bind-phone', { phone })
+  }
+}
 
 /**
  * 角色相关 API
@@ -88,13 +133,14 @@ export const characterApi = {
    */
   uploadBackground(filePath: string, type: BackgroundType): Promise<{ url: string; type: BackgroundType }> {
     return new Promise((resolve, reject) => {
+      const token = store.state.token
       mpx.uploadFile({
         url: `${API_BASE_URL}/companion/characters/upload-background`,
         filePath,
         name: 'file',
         formData: { type },
         header: {
-          'Authorization': `Bearer ${TEST_TOKEN}`
+          'Authorization': `Bearer ${token}`
         },
         success: (res: any) => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
