@@ -45,7 +45,7 @@ const store = createStore({
       }
 
       loginPromise = new Promise((resolve, reject) => {
-        mpx.login().then(({ code }) => {
+        mpx.login().then(({ code }: { code: string }) => {
           if (!code) {
             reject(new Error('获取登录凭证失败'))
             loginPromise = null
@@ -99,7 +99,7 @@ const store = createStore({
             loginPromise = null
             reject(error)
           })
-        }).catch(error => {
+        }).catch((error: any) => {
           console.error('获取登录凭证失败:', error)
           loginPromise = null
           reject(error)

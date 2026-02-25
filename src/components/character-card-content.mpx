@@ -2,9 +2,9 @@
   <!-- 内容卡片 -->
   <view class="content-card">
     <!-- 初始状态：显示角色介绍和问候语 -->
-    <view wx:if="{{!hasStartedChat}}">
+    <view wx:if="{{!hasStartedChat}}" class="intro-box">
       <!-- 角色介绍（仅首次聊天显示） -->
-      <view class="intro-section" wx:if="{{!character.hasChatHistory && character.description}}">
+      <view class="intro-section" wx:if="{{!character.hasStartedChat && character.description}}">
         <text class="intro-label">介绍：</text>
         <text class="intro-text">{{character.description}}</text>
       </view>
@@ -551,7 +551,7 @@ createComponent({
 
     updateMessages(nextMessages: Message[]) {
       this.messages = nextMessages
-      this.hasStartedChat = this.messages.length > 0
+      this.hasStartedChat = this.messages.length > 1
       this.cacheMessages()
       if (this.showHistory) {
         this.scrollToBottom()
@@ -777,6 +777,9 @@ createComponent({
   width 100vw
   padding 0rpx
   margin-bottom 40rpx
+
+  .intro-box 
+    padding 0 32rpx
 
   // 介绍部分
   .intro-section

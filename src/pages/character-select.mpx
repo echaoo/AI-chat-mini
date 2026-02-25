@@ -129,14 +129,11 @@ createPage({
       }
 
       try {
-        const [myChars, officialChars] = await Promise.all([
-          characterApi.getMyCharacters().catch(() => []),
-          characterApi.getOfficialCharacters().catch(() => [])
-        ])
+        const myChars = await characterApi.getMyCharacters().catch(() => [])
 
-        // 合并角色列表，官方角色在前
+        // 只使用自定义角色列表
         // 后端已返回 isFavorite 和 isPinnedToHome
-        this.characters = [...officialChars, ...myChars]
+        this.characters = myChars
 
         // 如果有目标角色，定位到该角色
         if (this.targetCharacterId) {

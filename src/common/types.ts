@@ -77,6 +77,7 @@ export interface Message {
   tokens: number | null
   createdAt: string
   isLoading?: boolean
+  messageType?: 'normal' | 'introduction' | 'greeting' // 消息类型：普通消息、角色介绍、问候语
 }
 
 // 获取对话消息响应
