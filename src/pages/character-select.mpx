@@ -17,7 +17,7 @@
         <!-- 角色背景图 -->
         <image
           class="bg-image"
-          src="{{item.avatarUrl}}"
+          src="{{item.chatBackgroundUrl || item.avatarUrl}}"
           mode="aspectFill"
         />
 
@@ -28,12 +28,9 @@
         <character-card-content
           character="{{item}}"
           initial-conversation-id="{{item.id === targetCharacterId ? targetConversationId : 0}}"
-          input-text="{{inputText}}"
           bindlike="handleLike"
           bindviewHistory="handleViewHistory"
           bindtoggleFavorite="handleToggleFavorite"
-          bindinput="handleInput"
-          bindsendMessage="handleSendMessage"
         />
       </swiper-item>
     </swiper>
@@ -58,7 +55,7 @@
 
 <script lang="ts">
 import { createPage } from '@mpxjs/core'
-import { characterApi, conversationApi } from '../common/api'
+import { characterApi } from '../common/api'
 import type { Character } from '../common/types'
 
 const FAVORITE_CHARACTERS_KEY = 'favorite_characters'
@@ -70,7 +67,6 @@ createPage({
     characters: [] as Character[],
     currentIndex: 0,
     showHint: true,
-    inputText: '',
     targetCharacterId: null as number | null, // 目标角色ID（用于定位）
     targetConversationId: null as number | null // 目标对话ID
   },
@@ -83,11 +79,20 @@ createPage({
     if (options.conversationId) {
       this.targetConversationId = parseInt(options.conversationId)
     }
+    if (options.from === 'home' && options.tip === 'pin') {
+      setTimeout(() => {
+        wx.showToast({ title: '喜欢的角色记得固定到首页，方便下次聊天', icon: 'none' })
+      }, 200)
+    }
 
     if (this.targetConversationId) {
       this.showHint = false
-      const cached = this.getPinnedCharacterCache() || this.getLastConversationCache()
-      if (cached && cached.conversationId === this.targetConversationId) {
+      const pinnedCache = this.getPinnedCharacterCache()
+      const lastCache = this.getLastConversationCache()
+      const cached = pinnedCache && pinnedCache.conversationId === this.targetConversationId
+        ? pinnedCache
+        : (lastCache && lastCache.conversationId === this.targetConversationId ? lastCache : null)
+      if (cached) {
         this.characters = [cached.character]
         this.currentIndex = 0
       } else {
@@ -208,54 +213,29 @@ createPage({
     },
 
     // 查看历史消息
-    handleViewHistory(e: any) {
-      const characterId = e.detail.characterId
-      // TODO: 查询该角色的对话ID，如果有则跳转到聊天页
+    handleViewHistory() {
       wx.navigateTo({
-        url: `/pages/chat?characterId=${characterId}`
+        url: '/pages/conversations'
       })
-    },
-
-    // 输入框内容变化
-    handleInput(e: any) {
-      this.inputText = e.detail.value
-    },
-
-    // 发送消息
-    async handleSendMessage(e: any) {
-      const { character, message } = e.detail
-
-      if (!message) {
-        return
-      }
-
-      // 创建对话并跳转到聊天页
-      try {
-        const conversation = await conversationApi.createConversation(character.id)
-
-        // 跳转到聊天页，并传递初始消息
-        wx.navigateTo({
-          url: `/pages/chat?conversationId=${conversation.id}&initialMessage=${encodeURIComponent(message)}`
-        })
-
-        // 清空输入框
-        this.inputText = ''
-      } catch (err: any) {
-        wx.showToast({ title: err.message || '创建对话失败', icon: 'none' })
-      }
     },
 
     // Swiper 切换
     handleSwiperChange(e: any) {
       this.currentIndex = e.detail.current
       this.showHint = false
-      // 切换时清空输入框
-      this.inputText = ''
     },
 
     // 返回
     handleGoBack() {
-      wx.navigateBack()
+      const pages = getCurrentPages()
+      console.log('pages', pages)
+      if (pages.length > 1) {
+        wx.navigateBack()
+      } else {
+        wx.redirectTo({
+          url: '/pages/index'
+        })
+      }
     },
 
     // 查看收藏列表

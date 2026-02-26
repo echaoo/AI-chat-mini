@@ -59,6 +59,9 @@ import { createPage } from '@mpxjs/core'
 import { conversationApi } from '../common/api'
 import type { Conversation } from '../common/types'
 
+const CONVERSATION_CACHE_KEY = 'last_conversation_id'
+const LAST_CONVERSATION_CHARACTER_KEY = 'last_conversation_character'
+
 createPage({
   data: {
     conversations: [] as Conversation[],
@@ -95,9 +98,21 @@ createPage({
 
     handleConversationTap(e: any) {
       const conversation = e.currentTarget.dataset.conversation
-      // 跳转到聊天页面，加载历史消息
+      // 缓存对话信息，跳转到角色卡片页加载历史消息
+      try {
+        wx.setStorageSync(CONVERSATION_CACHE_KEY, conversation.id)
+        if (conversation.character) {
+          wx.setStorageSync(LAST_CONVERSATION_CHARACTER_KEY, {
+            conversationId: conversation.id,
+            character: conversation.character,
+            timestamp: Date.now()
+          })
+        }
+      } catch (e) {
+        // 忽略缓存错误
+      }
       wx.navigateTo({
-        url: `/pages/chat?conversationId=${conversation.id}`
+        url: `/pages/character-select?conversationId=${conversation.id}`
       })
     },
 

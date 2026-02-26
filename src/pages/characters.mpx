@@ -114,9 +114,9 @@ createPage({
     handleCharacterTap(e: any) {
       const character = e.detail.character
 
-      // 跳转到聊天页面
+      // 跳转到角色卡片页
       wx.navigateTo({
-        url: `/pages/chat?characterId=${character.id}`
+        url: `/pages/character-select?characterId=${character.id}`
       })
     },
 

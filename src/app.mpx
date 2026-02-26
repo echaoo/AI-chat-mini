@@ -77,7 +77,6 @@ createApp({
       "./pages/index",
       "./pages/character-select",
       "./pages/characters",
-      "./pages/chat",
       "./pages/conversations",
       "./pages/create-character"
     ],

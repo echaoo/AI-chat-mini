@@ -1,5 +1,5 @@
 <template>
-  <view class="container">
+  <view class="container" style="{{backgroundStyle}}">
     <view class="content-wrapper">
       <view class="text-card">
         <view class="card-corner-tab">{{characterName}}</view>
@@ -36,6 +36,7 @@ const GREETING_CACHE_KEY = 'greeting_cache'
 const GREETING_CACHE_DURATION_MS = 3 * 60 * 60 * 1000 // 3 hours
 const CONVERSATION_CACHE_KEY = 'last_conversation_id'
 const HOME_CHARACTER_CACHE_KEY = 'home_character' // 首页固定角色缓存
+const LAST_CONVERSATION_CHARACTER_KEY = 'last_conversation_character'
 const GREETING_COMMAND = '[GET_GREETING]'
 
 createPage({
@@ -43,7 +44,8 @@ createPage({
     greetingText: '', // 问候语
     characterName: '', // 角色名称
     characterId: null as number | null, // 角色 ID
-    conversationId: null as number | null // 缓存的对话 ID
+    conversationId: null as number | null, // 缓存的对话 ID
+    backgroundStyle: '' // 背景样式
   },
 
   // 用于取消预取任务的标记
@@ -81,6 +83,8 @@ createPage({
           this.characterId = cached.characterId || null
           this.conversationId = cached.conversationId || null
           hasCache = true
+          // 设置背景图片
+          this.updateBackground(cached.character.chatBackgroundUrl)
           // 有缓存时立即显示问候语
           this.updateAndDisplayGreeting()
         }
@@ -116,6 +120,9 @@ createPage({
           this.characterId = serverData.characterId
           this.conversationId = serverData.conversationId
 
+          // 更新背景图片（使用接口返回的数据，如果没有则为 null）
+          this.updateBackground((serverData as any).chatBackgroundUrl || null)
+
           // 更新缓存
           const cacheData = {
             characterId: serverData.characterId,
@@ -124,7 +131,10 @@ createPage({
               id: serverData.characterId,
               name: serverData.name,
               avatarUrl: serverData.avatarUrl,
-              description: serverData.description
+              description: serverData.description,
+              chatBackgroundUrl: (serverData as any).chatBackgroundUrl || null,
+              companionBackgroundUrl: (serverData as any).companionBackgroundUrl || null,
+              sleepBackgroundUrl: (serverData as any).sleepBackgroundUrl || null
             },
             timestamp: Date.now()
           }
@@ -133,13 +143,23 @@ createPage({
           // 显示问候语
           this.updateAndDisplayGreeting()
         } else {
-          // 4. 接口返回 null，清空缓存
-          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
+          // 4. 接口返回 null，尝试用最近一次聊天角色自动固定到首页
+          const lastConversation = this.getLastConversationCache()
+          if (lastConversation && lastConversation.character && lastConversation.character.id) {
+            this.applyHomeCharacterFromCache(lastConversation)
+            try {
+              await characterApi.togglePinToHome(lastConversation.character.id)
+            } catch (e) {
+              console.warn('[Home] 自动固定角色失败:', e)
+            }
+            return
+          }
 
-          // 如果本地无缓存，跳转到角色列表
+          // 无最近聊天缓存时，清空缓存并跳转到角色列表
+          wx.removeStorageSync(HOME_CHARACTER_CACHE_KEY)
           if (!hasCache) {
             wx.redirectTo({
-              url: '/pages/character-select'
+              url: '/pages/character-select?from=home&tip=pin'
             })
           }
         }
@@ -150,10 +170,44 @@ createPage({
         // 如果本地无缓存且接口失败，跳转到角色列表
         if (!hasCache) {
           wx.redirectTo({
-            url: '/pages/character-select'
+            url: '/pages/character-select?from=home&tip=pin'
           })
         }
       }
+    },
+
+    getLastConversationCache() {
+      try {
+        return wx.getStorageSync(LAST_CONVERSATION_CHARACTER_KEY) || null
+      } catch (e) {
+        return null
+      }
+    },
+
+    applyHomeCharacterFromCache(cached: any) {
+      const character = cached.character || {}
+      this.characterName = character.name || ''
+      this.characterId = character.id || null
+      this.conversationId = cached.conversationId || null
+
+      this.updateBackground(character.chatBackgroundUrl || null)
+
+      const cacheData = {
+        characterId: character.id || null,
+        conversationId: cached.conversationId || null,
+        character: {
+          id: character.id,
+          name: character.name,
+          avatarUrl: character.avatarUrl,
+          description: character.description,
+          chatBackgroundUrl: character.chatBackgroundUrl || null,
+          companionBackgroundUrl: character.companionBackgroundUrl || null,
+          sleepBackgroundUrl: character.sleepBackgroundUrl || null
+        },
+        timestamp: Date.now()
+      }
+      wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
+      this.updateAndDisplayGreeting()
     },
 
     /**
@@ -303,6 +357,17 @@ createPage({
       wx.navigateTo({
         url: '/pages/conversations'
       })
+    },
+
+    /**
+     * @description 更新背景图片
+     */
+    updateBackground(chatBackgroundUrl?: string | null) {
+      if (chatBackgroundUrl) {
+        this.backgroundStyle = `background-image: url(${chatBackgroundUrl}); background-size: cover; background-position: center; background-repeat: no-repeat;`
+      } else {
+        this.backgroundStyle = ''
+      }
     }
   }
 })
@@ -314,6 +379,7 @@ createPage({
   height 100vh
   background-size cover
   background-position center
+  background-repeat no-repeat
   display flex
   flex-direction column
   justify-content flex-end

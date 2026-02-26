@@ -100,6 +100,9 @@ export const characterApi = {
     description: string
     greetingMessage: string
     conversationId: number | null
+    chatBackgroundUrl?: string | null
+    companionBackgroundUrl?: string | null
+    sleepBackgroundUrl?: string | null
   } | null> {
     return get('/companion/characters/pinned/home')
   },

@@ -706,7 +706,12 @@ createComponent({
           const cacheData = {
             characterId: this.character.id,
             conversationId: this.conversationId || null,
-            character: { ...this.character },
+            character: {
+              ...this.character,
+              chatBackgroundUrl: this.character.chatBackgroundUrl,
+              companionBackgroundUrl: this.character.companionBackgroundUrl,
+              sleepBackgroundUrl: this.character.sleepBackgroundUrl
+            },
             timestamp: Date.now()
           }
           wx.setStorageSync(HOME_CHARACTER_CACHE_KEY, cacheData)
