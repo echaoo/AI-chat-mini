@@ -5,7 +5,7 @@ import mpx from '@mpxjs/core'
 import { get, post, del } from './request'
 import { API_BASE_URL } from './config'
 import store from './store'
-import type { Character, Conversation, CreateConversationResponse, Message, CreateCharacterRequest, SendMessageResponse, ConversationMessagesResponse } from './types'
+import type { Character, ChatMode, Conversation, CreateConversationResponse, Message, CreateCharacterRequest, SendMessageResponse, ConversationMessagesResponse } from './types'
 
 /**
  * 背景图类型
@@ -64,15 +64,7 @@ export const characterApi = {
    * 获取官方角色列表
    */
   async getOfficialCharacters(): Promise<Character[]> {
-    const result = await get<{ list: Character[] }>('/companion/characters/official', false)
-    return result?.list || []
-  },
-
-  /**
-   * 获取我的自定义角色列表
-   */
-  async getMyCharacters(): Promise<Character[]> {
-    const result = await get<{ list: Character[] }>('/companion/characters/my')
+    const result = await get<{ list: Character[] }>('/companion/characters/official')
     return result?.list || []
   },
 
@@ -195,8 +187,12 @@ export const conversationApi = {
   /**
    * 发送消息
    */
-  sendMessage(conversationId: number, content: string): Promise<SendMessageResponse> {
-    return post<SendMessageResponse>(`/companion/conversations/${conversationId}/messages`, { content })
+  sendMessage(conversationId: number, content: string, chatMode?: ChatMode): Promise<SendMessageResponse> {
+    const payload: { content: string; chatMode?: ChatMode } = { content }
+    if (chatMode) {
+      payload.chatMode = chatMode
+    }
+    return post<SendMessageResponse>(`/companion/conversations/${conversationId}/messages`, payload)
   },
 
   /**

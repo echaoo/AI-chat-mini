@@ -71,32 +71,26 @@ createApp({
 
 </style>
 
-<script type="application/json">
-  {
-    "pages": [
-      "./pages/index",
-      "./pages/character-select",
-      "./pages/characters",
-      "./pages/conversations",
-      "./pages/create-character"
+<script name="json">
+  const config = {
+    pages: [
+      './pages/index',
+      './pages/character-select',
+      './pages/characters',
+      './pages/conversations',
+      './pages/create-character'
     ],
-
-    "window": {
-      "backgroundTextStyle": "light",
-      "navigationBarBackgroundColor": "#fff",
-      "navigationBarTitleText": "AI 陪伴",
-      "navigationBarTextStyle": "black"
+    window: {
+      backgroundTextStyle: 'light',
+      navigationBarBackgroundColor: '#fff',
+      navigationBarTitleText: 'AI 陪伴',
+      navigationBarTextStyle: 'black'
     }
   }
+
+  if (__mpx_mode__ === 'wx') {
+    config.lazyCodeLoading = 'requiredComponents'
+  }
+
+  module.exports = config
 </script>
-
-<!--也可以通过以下形式用js输出json，便于书写注释和使用条件编译-->
-
-<!--<script name="json">-->
-<!--  // 可以写注释，通过defs注入的常量做一些判断之类的操作-->
-<!--  module.exports = {-->
-<!--    pages: [-->
-<!--      './pages/index'-->
-<!--    ]-->
-<!--  }-->
-<!--</script>-->

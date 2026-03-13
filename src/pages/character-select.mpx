@@ -32,10 +32,12 @@
         <!-- 角色卡片内容组件 -->
         <character-card-content
           character="{{item}}"
+          pinned-character-id="{{pinnedCharacterId}}"
           initial-conversation-id="{{item.id === targetCharacterId ? targetConversationId : 0}}"
           chat-mode="{{chatMode}}"
           bindlike="handleLike"
           bindviewHistory="handleViewHistory"
+          bindpinToHome="handlePinToHomeChange"
           bindtoggleFavorite="handleToggleFavorite"
         />
       </swiper-item>
@@ -77,6 +79,7 @@ createPage({
   data: {
     characters: [] as Character[],
     currentIndex: 0,
+    pinnedCharacterId: 0,
     showHint: true,
     targetCharacterId: null as number | null, // 目标角色ID（用于定位）
     targetConversationId: null as number | null, // 目标对话ID
@@ -105,7 +108,14 @@ createPage({
         ? pinnedCache
         : (lastCache && lastCache.conversationId === this.targetConversationId ? lastCache : null)
       if (cached) {
-        this.characters = [cached.character]
+        const pinnedCharacterId = pinnedCache && pinnedCache.characterId === cached.character.id
+          ? cached.character.id
+          : 0
+        this.pinnedCharacterId = pinnedCharacterId
+        this.characters = [{
+          ...cached.character,
+          isPinnedToHome: pinnedCharacterId === cached.character.id
+        }]
         this.currentIndex = 0
       } else {
         wx.showToast({ title: '本地缓存不存在，请先进入该对话', icon: 'none' })
@@ -151,6 +161,7 @@ createPage({
         // 只使用官方角色列表
         // 后端已返回 isFavorite 和 isPinnedToHome
         this.characters = officialChars
+        this.pinnedCharacterId = officialChars.find(char => char.isPinnedToHome)?.id || 0
 
         // 如果有目标角色，定位到该角色
         if (this.targetCharacterId) {
@@ -229,6 +240,18 @@ createPage({
       wx.navigateTo({
         url: '/pages/conversations'
       })
+    },
+
+    handlePinToHomeChange(e: any) {
+      const { characterId, isPinned } = e.detail || {}
+      if (!characterId) return
+
+      const pinnedCharacterId = isPinned ? characterId : 0
+      this.pinnedCharacterId = pinnedCharacterId
+      this.characters = this.characters.map(character => ({
+        ...character,
+        isPinnedToHome: pinnedCharacterId > 0 && character.id === pinnedCharacterId
+      }))
     },
 
     // Swiper 切换

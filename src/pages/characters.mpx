@@ -92,17 +92,12 @@ createPage({
       this.error = ''
 
       try {
-        // 并行加载官方角色和自定义角色
-        const [myChars, officialChars] = await Promise.all([
-          characterApi.getMyCharacters().catch(() => {
-            return [] as Character[]
-          }),
-          characterApi.getOfficialCharacters().catch(() => {
-            return [] as Character[]
-          })
-        ])
+        // 加载官方角色
+        const officialChars = await characterApi.getOfficialCharacters().catch(() => {
+          return [] as Character[]
+        })
 
-        this.myCharacters = Array.isArray(myChars) ? myChars : []
+        this.myCharacters = []
         this.officialCharacters = Array.isArray(officialChars) ? officialChars : []
       } catch (err: any) {
         this.error = err.message || '加载失败'

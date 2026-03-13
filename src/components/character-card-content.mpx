@@ -11,7 +11,7 @@
 
       <!-- 问候语消息 -->
       <view class="greeting-message">
-        <text class="message-text">{{character.greetingMessage || '你好~'}}</text>
+        <text class="message-text">{{messages[0].content || '你好~'}}</text>
       </view>
     </view>
 
@@ -71,21 +71,24 @@
           class="tool-item favorite-tool {{character.isFavorite ? 'active' : ''}}"
           bindtap="handleToggleFavorite"
         >
-          <text class="tool-icon">{{character.isFavorite ? '❤️' : '🤍'}}</text>
+          <text class="tool-icon">{{character.isFavorite ? '♥' : '♡'}}</text>
+          <text class="tool-label">收藏</text>
         </view>
 
         <!-- 固定到首页 -->
         <view
-          class="tool-item pin-tool {{isPinned ? 'active' : ''}}"
+          class="tool-item pin-tool {{character.id === pinnedCharacterId ? 'active' : ''}}"
           bindtap="handlePinToHome"
         >
-          <text class="tool-icon">{{isPinned ? '★' : '☆'}}</text>
+          <text class="tool-icon">{{character.id === pinnedCharacterId ? '★' : '☆'}}</text>
+          <text class="tool-label">首页</text>
         </view>
         <view
           class="tool-item history-tool {{showHistory ? 'active' : ''}}"
           bindtap="toggleHistory"
         >
-          <text class="tool-icon">🕘</text>
+          <text class="tool-icon">◷</text>
+          <text class="tool-label">历史</text>
         </view>
       </view>
     </view>
@@ -117,7 +120,7 @@
 <script lang="ts">
 import { createComponent } from '@mpxjs/core'
 import { characterApi, conversationApi } from '../common/api'
-import type { Character, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
+import type { Character, ChatMode, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
 
 type UIMessage = Message & { isLoading?: boolean }
 
@@ -147,6 +150,14 @@ createComponent({
     initialMessage: {
       type: String,
       value: ''
+    },
+    pinnedCharacterId: {
+      type: Number,
+      value: 0
+    },
+    chatMode: {
+      type: String,
+      value: 'normal'
     }
   },
 
@@ -156,7 +167,6 @@ createComponent({
     inputText: '',
     loading: false,
     sending: false,
-    isPinned: false,
     hasStartedChat: false, // 是否已开始聊天
     showHistory: false,
     scrollWithAnimation: true,
@@ -239,7 +249,6 @@ createComponent({
         await this.createNewConversation()
       }
 
-      this.checkIfPinned()
     },
 
     // 创建新对话
@@ -366,7 +375,11 @@ createComponent({
       this.updateMessages(loadingMessages)
       this.sending = true
       try {
-        const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
+        const response: SendMessageResponse = await conversationApi.sendMessage(
+          this.conversationId,
+          content,
+          this.chatMode as ChatMode
+        )
         const nextMessages = [...this.messages]
         nextMessages[index] = response.assistantMessage
         this.updateMessages(nextMessages)
@@ -503,7 +516,11 @@ createComponent({
 
       try {
         // 2. 发送消息到后端，并接收助手消息
-        const response: SendMessageResponse = await conversationApi.sendMessage(this.conversationId, content)
+        const response: SendMessageResponse = await conversationApi.sendMessage(
+          this.conversationId,
+          content,
+          this.chatMode as ChatMode
+        )
 
         // 3. 将助手消息添加到列表
         const messagesCopy = [...this.messages]
@@ -679,16 +696,6 @@ createComponent({
       })
     },
 
-    // 检查是否已固定到首页（从本地缓存判断，用于快速显示）
-    checkIfPinned() {
-      try {
-        const cached = wx.getStorageSync(HOME_CHARACTER_CACHE_KEY)
-        this.isPinned = cached && cached.characterId === this.character?.id
-      } catch (e) {
-        this.isPinned = false
-      }
-    },
-
     // 固定/取消固定到首页
     async handlePinToHome() {
       if (!this.character) {
@@ -699,7 +706,6 @@ createComponent({
       try {
         // 调用后端接口
         const result = await characterApi.togglePinToHome(this.character.id)
-        this.isPinned = result.isPinnedToHome
 
         if (result.isPinnedToHome) {
           // 固定成功，更新本地缓存
@@ -724,7 +730,7 @@ createComponent({
 
         // 通知父组件更新其他角色卡片的固定状态
         this.triggerEvent('pinToHome', {
-          character: this.character,
+          characterId: this.character.id,
           isPinned: result.isPinnedToHome
         })
       } catch (e: any) {
@@ -906,31 +912,56 @@ createComponent({
         display flex
         flex-direction column
         align-items center
-        gap 2rpx
+        justify-content center
+        width 92rpx
+        height 92rpx
+        gap 6rpx
+        border-radius 28rpx
+        background rgba(255, 255, 255, 0.1)
+        backdrop-filter blur(18rpx)
+        border 1rpx solid rgba(255, 255, 255, 0.16)
+        box-shadow 0 8rpx 24rpx rgba(0, 0, 0, 0.12)
         transition all 0.2s
 
         &:active
           transform scale(0.95)
 
         .tool-icon
-          font-size 32rpx
-          color: #fff
+          font-size 30rpx
+          line-height 1
+          color rgba(255, 255, 255, 0.92)
 
-        .tool-count
-          font-size 20rpx
-          color rgba(255, 255, 255, 0.8)
+        .tool-label
+          font-size 18rpx
+          line-height 1
+          color rgba(255, 255, 255, 0.72)
 
         &.favorite-tool.active
-          background rgba(255, 100, 100, 0.25)
-          border-color rgba(255, 100, 100, 0.4)
+          background rgba(255, 120, 150, 0.18)
+          border-color rgba(255, 184, 202, 0.35)
+
+          .tool-icon
+            color #ff9ab0
+
+          .tool-label
+            color rgba(255, 215, 222, 0.92)
 
         &.pin-tool.active
-          background rgba(255, 215, 0, 0.25)
-          border-color rgba(255, 215, 0, 0.4)
+          background rgba(255, 228, 188, 0.16)
+          border-color rgba(255, 233, 203, 0.36)
+
+          .tool-icon
+            color #ffe2a6
+
+          .tool-label
+            color rgba(255, 240, 219, 0.92)
 
         &.history-tool.active
-          background rgba(255, 255, 255, 0.2)
-          border-color rgba(255, 255, 255, 0.35)
+          background rgba(255, 255, 255, 0.16)
+          border-color rgba(255, 255, 255, 0.3)
+
+          .tool-label
+            color rgba(255, 255, 255, 0.9)
 
   // 输入框部分
   .input-section

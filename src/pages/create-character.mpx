@@ -22,7 +22,7 @@
           placeholder="请输入角色描述（可选）"
           value="{{form.description}}"
           bindinput="handleDescriptionInput"
-          maxlength="200"
+          maxlength="2000"
         />
       </view>
 
@@ -38,7 +38,7 @@
 }'
           value="{{form.systemPrompt}}"
           bindinput="handleSystemPromptInput"
-          maxlength="2000"
+          maxlength="20000"
         />
         <text class="tip {{jsonError ? 'error' : ''}}">{{jsonError || '请输入符合要求的JSON格式角色设定'}}</text>
       </view>
@@ -50,7 +50,7 @@
           placeholder="请输入角色的欢迎消息（可选）"
           value="{{form.greetingMessage}}"
           bindinput="handleGreetingInput"
-          maxlength="200"
+          maxlength="2000"
         />
       </view>
 
@@ -62,6 +62,60 @@
           value="{{form.avatarUrl}}"
           bindinput="handleAvatarUrlInput"
         />
+      </view>
+
+      <view class="form-item">
+        <text class="label">能力等级</text>
+        <input
+          class="input"
+          type="number"
+          placeholder="请输入 0~3（0=普通人，3=能力者）"
+          value="{{form.abilityLevel}}"
+          bindinput="handleAbilityLevelInput"
+        />
+        <text class="tip">0=普通人，1=感知者，2=从业者，3=能力者</text>
+      </view>
+
+      <view class="form-item">
+        <text class="label">物种类型</text>
+        <input
+          class="input"
+          placeholder="human / spirit / goblin（可选）"
+          value="{{form.speciesType}}"
+          bindinput="handleSpeciesTypeInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="label">所属组织</text>
+        <input
+          class="input"
+          placeholder="exorcist_guild / yokai_alliance（可选）"
+          value="{{form.organization}}"
+          bindinput="handleOrganizationInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="label">角色规则 (JSON格式)</text>
+        <textarea
+          class="textarea"
+          placeholder='可选，示例：
+{
+  "abilities": ["通过塔罗牌感知未来片段"],
+  "limitations": ["每天最多占卜3次"],
+  "ability_details": [
+    {
+      "type": "塔罗占卜",
+      "description": "通过塔罗牌看到未来的可能性"
+    }
+  ]
+}'
+          value="{{form.characterRules}}"
+          bindinput="handleCharacterRulesInput"
+          maxlength="10000"
+        />
+        <text class="tip {{characterRulesError ? 'error' : ''}}">{{characterRulesError || '请输入JSON对象；可选字段：abilities / limitations / personality_constraints / personal_taboos / ability_details'}}</text>
       </view>
 
       <!-- 背景图上传区域 -->
@@ -144,6 +198,7 @@
 <script lang="ts">
 import mpx, { createPage } from '@mpxjs/core'
 import { characterApi, BackgroundType } from '../common/api'
+import type { CharacterRules } from '../common/types'
 
 createPage({
   data: {
@@ -153,6 +208,10 @@ createPage({
       systemPrompt: '',
       greetingMessage: '',
       avatarUrl: '',
+      abilityLevel: '',
+      speciesType: 'human',
+      organization: '',
+      characterRules: '',
       chatBackgroundUrl: '',
       sleepBackgroundUrl: '',
       companionBackgroundUrl: ''
@@ -164,7 +223,8 @@ createPage({
     },
     submitting: false,
     canSubmit: false,
-    jsonError: '' // JSON 验证错误信息
+    jsonError: '', // JSON 验证错误信息
+    characterRulesError: '' // characterRules JSON 验证错误信息
   },
 
   onLoad() {
@@ -242,11 +302,88 @@ createPage({
       })
     },
 
-    checkCanSubmit() {
-      const { name, systemPrompt } = this.form
-      const isJsonValid = this.validateJSON(systemPrompt)
+    handleAbilityLevelInput(e: any) {
       this.setData({
-        canSubmit: name.trim() !== '' && systemPrompt.trim() !== '' && isJsonValid
+        'form.abilityLevel': e.detail.value
+      })
+      this.checkCanSubmit()
+    },
+
+    handleSpeciesTypeInput(e: any) {
+      this.setData({
+        'form.speciesType': e.detail.value
+      })
+    },
+
+    handleOrganizationInput(e: any) {
+      this.setData({
+        'form.organization': e.detail.value
+      })
+    },
+
+    handleCharacterRulesInput(e: any) {
+      const value = e.detail.value
+      this.setData({
+        'form.characterRules': value
+      })
+      this.validateCharacterRules(value)
+      this.checkCanSubmit()
+    },
+
+    validateCharacterRules(jsonStr: string) {
+      if (!jsonStr.trim()) {
+        this.setData({ characterRulesError: '' })
+        return true
+      }
+
+      let rules: Record<string, unknown>
+      try {
+        const parsed = JSON.parse(jsonStr)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          this.setData({ characterRulesError: 'characterRules 必须是 JSON 对象' })
+          return false
+        }
+        rules = parsed
+      } catch (error) {
+        this.setData({ characterRulesError: 'characterRules JSON 格式错误，请检查格式' })
+        return false
+      }
+
+      const arrayFields = ['abilities', 'limitations', 'personality_constraints', 'personal_taboos', 'ability_details']
+      for (const key of arrayFields) {
+        if (rules[key] !== undefined && !Array.isArray(rules[key])) {
+          this.setData({ characterRulesError: `characterRules.${key} 必须是数组` })
+          return false
+        }
+      }
+
+      const abilityDetails = rules.ability_details
+      if (Array.isArray(abilityDetails)) {
+        const isValid = abilityDetails.every((item: any) => {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+          const hasType = typeof item.type === 'string' && item.type.trim() !== ''
+          const hasDescription = typeof item.description === 'string' && item.description.trim() !== ''
+          return hasType && hasDescription
+        })
+
+        if (!isValid) {
+          this.setData({
+            characterRulesError: 'characterRules.ability_details 每项需包含 type 和 description'
+          })
+          return false
+        }
+      }
+
+      this.setData({ characterRulesError: '' })
+      return true
+    },
+
+    checkCanSubmit() {
+      const { name, systemPrompt, characterRules } = this.form
+      const isJsonValid = this.validateJSON(systemPrompt)
+      const isCharacterRulesValid = this.validateCharacterRules(characterRules)
+      this.setData({
+        canSubmit: name.trim() !== '' && systemPrompt.trim() !== '' && isJsonValid && isCharacterRulesValid
       })
     },
 
@@ -320,6 +457,10 @@ createPage({
         systemPrompt,
         greetingMessage,
         avatarUrl,
+        abilityLevel,
+        speciesType,
+        organization,
+        characterRules,
         chatBackgroundUrl,
         sleepBackgroundUrl,
         companionBackgroundUrl
@@ -352,15 +493,44 @@ createPage({
         return
       }
 
+      const abilityLevelValue = abilityLevel.trim()
+      if (abilityLevelValue) {
+        const parsedAbilityLevel = Number(abilityLevelValue)
+        if (!Number.isInteger(parsedAbilityLevel) || parsedAbilityLevel < 0 || parsedAbilityLevel > 3) {
+          mpx.showToast({
+            title: '能力等级必须是 0~3 的整数',
+            icon: 'none'
+          })
+          return
+        }
+      }
+
+      if (!this.validateCharacterRules(characterRules)) {
+        mpx.showToast({
+          title: this.characterRulesError || '角色规则 JSON 格式错误',
+          icon: 'none',
+          duration: 2000
+        })
+        return
+      }
+
       this.setData({ submitting: true })
 
       try {
+        const parsedCharacterRules: CharacterRules | undefined = characterRules.trim()
+          ? JSON.parse(characterRules.trim())
+          : undefined
+
         const character = await characterApi.createCharacter({
           name: name.trim(),
           description: description.trim() || undefined,
           systemPrompt: systemPrompt.trim(),
           greetingMessage: greetingMessage.trim() || undefined,
           avatarUrl: avatarUrl.trim() || undefined,
+          abilityLevel: abilityLevelValue ? Number(abilityLevelValue) : undefined,
+          speciesType: speciesType.trim() || undefined,
+          organization: organization.trim() || undefined,
+          characterRules: parsedCharacterRules,
           chatBackgroundUrl: chatBackgroundUrl || undefined,
           sleepBackgroundUrl: sleepBackgroundUrl || undefined,
           companionBackgroundUrl: companionBackgroundUrl || undefined
