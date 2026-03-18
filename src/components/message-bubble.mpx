@@ -11,7 +11,13 @@
           <view class="dot"></view>
         </view>
       </view>
-      <text wx:else class="content">{{message.content}}</text>
+      <text wx:else class="content">
+        <text
+          wx:for="{{segments}}"
+          wx:key="key"
+          class="content-segment {{item.isAside ? 'aside-text' : ''}}"
+        >{{item.text}}</text>
+      </text>
       <text wx:if="{{!message.isLoading}}" class="time">{{formatTime(message.createdAt)}}</text>
     </view>
   </view>
@@ -20,11 +26,20 @@
 <script lang="ts">
 import { createComponent } from '@mpxjs/core'
 
+interface MessageSegment {
+  key: string
+  text: string
+  isAside: boolean
+}
+
 createComponent({
   properties: {
     message: {
       type: Object,
-      value: {}
+      value: {},
+      observer(newMessage: { content?: string }) {
+        this.syncSegments(newMessage?.content || '')
+      }
     },
     index: {
       type: Number,
@@ -32,7 +47,62 @@ createComponent({
     }
   },
 
+  data: {
+    segments: [] as MessageSegment[]
+  },
+
+  lifetimes: {
+    attached() {
+      this.syncSegments(this.message?.content || '')
+    }
+  },
+
   methods: {
+    syncSegments(content: string) {
+      const segments = this.parseContentSegments(content)
+      if (typeof this.setData === 'function') {
+        this.setData({ segments })
+        return
+      }
+      this.segments = segments
+    },
+    parseContentSegments(content: string): MessageSegment[] {
+      if (!content) return []
+
+      const pattern = /（[^）]*）|\([^)]*\)/g
+      const segments: MessageSegment[] = []
+      let lastIndex = 0
+      let segmentIndex = 0
+
+      for (let match = pattern.exec(content); match; match = pattern.exec(content)) {
+        if (match.index > lastIndex) {
+          segments.push({
+            key: `text-${segmentIndex}`,
+            text: content.slice(lastIndex, match.index),
+            isAside: false
+          })
+          segmentIndex += 1
+        }
+
+        segments.push({
+          key: `aside-${segmentIndex}`,
+          text: match[0],
+          isAside: true
+        })
+        segmentIndex += 1
+        lastIndex = match.index + match[0].length
+      }
+
+      if (lastIndex < content.length) {
+        segments.push({
+          key: `text-${segmentIndex}`,
+          text: content.slice(lastIndex),
+          isAside: false
+        })
+      }
+
+      return segments
+    },
     handleLongPress() {
       this.triggerEvent('messageLongPress', {
         message: this.message,
@@ -82,6 +152,11 @@ vendors=official
       font-size 28rpx
       line-height 1.5
       word-wrap break-word
+      word-break break-word
+      white-space pre-wrap
+
+      .content-segment
+        display inline
 
     .time
       font-size 20rpx
@@ -127,6 +202,9 @@ vendors=official
     .content
       color #333
 
+      .aside-text
+        color #8f8f8f
+
     .loading-text
       color #666
 
@@ -136,11 +214,14 @@ vendors=official
   align-items flex-end
 
   .bubble
-    background #667eea
+    background rgba(0, 0, 0, 0.72)
     color #fff
 
     .content
       color #fff
+
+      .aside-text
+        color rgba(255, 255, 255, 0.58)
 
     .time
       color rgba(255, 255, 255, 0.7)
