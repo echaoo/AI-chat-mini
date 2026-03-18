@@ -18,6 +18,11 @@ export interface Character {
   companionBackgroundUrl: string | null
   createdAt: string
   updatedAt: string
+  abilityLevel?: number
+  speciesType?: string
+  organization?: string | null
+  characterRules?: CharacterRules | null
+  profileJson?: CharacterProfile | null
   // 后端返回的聊天统计字段（需要认证）
   hasChatHistory?: boolean
   messageCount?: number
@@ -27,16 +32,36 @@ export interface Character {
   isPinnedToHome?: boolean
 }
 
+export interface CharacterAbilityDetail {
+  type: string
+  description: string
+  cooldown?: string
+  cost?: string
+}
+
+export interface CharacterRules {
+  abilities?: string[]
+  limitations?: string[]
+  personality_constraints?: string[]
+  personal_taboos?: string[]
+  ability_details?: CharacterAbilityDetail[]
+}
+
 // 创建角色请求
 export interface CreateCharacterRequest {
   name: string
   description?: string
-  systemPrompt: string
+  systemPrompt?: string
+  profileJson?: CharacterProfile
   greetingMessage?: string
   avatarUrl?: string
   chatBackgroundUrl?: string
   sleepBackgroundUrl?: string
   companionBackgroundUrl?: string
+  abilityLevel?: number
+  speciesType?: string
+  organization?: string
+  characterRules?: CharacterRules
 }
 
 // 对话
@@ -80,6 +105,8 @@ export interface Message {
   messageType?: 'normal' | 'introduction' | 'greeting' // 消息类型：普通消息、角色介绍、问候语
 }
 
+export type ChatMode = 'normal' | 'romantic'
+
 // 获取对话消息响应
 export interface ConversationMessagesResponse {
   conversationId: number
@@ -115,7 +142,7 @@ export interface UserInfo {
 // 角色设定结构化数据（推荐方案）
 export interface CharacterProfile {
   core_summary: string // 核心摘要，不超过200字
-  personality_traits: string[] // 性格特质数组
+  personality_traits?: string[] // 性格特质数组
   background_story?: string // 背景故事（可选）
   dialogue_examples: string[] // 对话示例数组，2-3个
   other_info?: string // 其他信息（可选）
