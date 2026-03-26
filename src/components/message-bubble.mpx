@@ -11,13 +11,13 @@
           <view class="dot"></view>
         </view>
       </view>
-      <text wx:else class="content">
-        <text
-          wx:for="{{segments}}"
-          wx:key="key"
-          class="content-segment {{item.isAside ? 'aside-text' : ''}}"
-        >{{item.text}}</text>
-      </text>
+      <view wx:else class="content">
+        <block wx:for="{{segments}}" wx:key="key">
+          <text
+            class="content-segment {{item.isAside ? 'aside-text' : ''}}"
+          >{{item.text}}</text>
+        </block>
+      </view>
       <text wx:if="{{!message.isLoading}}" class="time">{{formatTime(message.createdAt)}}</text>
     </view>
   </view>
@@ -59,12 +59,19 @@ createComponent({
 
   methods: {
     syncSegments(content: string) {
-      const segments = this.parseContentSegments(content)
+      const segments = this.parseContentSegments(this.normalizeDisplayedContent(content))
       if (typeof this.setData === 'function') {
         this.setData({ segments })
         return
       }
       this.segments = segments
+    },
+    normalizeDisplayedContent(content: string) {
+      if (!content) return ''
+
+      return content
+        .replace(/\*(\s*[（(][^）)]*[）)]\s*)\*/g, '$1')
+        .replace(/([（(][^）)]*[）)])/g, (match) => match.replace(/\*/g, ''))
     },
     parseContentSegments(content: string): MessageSegment[] {
       if (!content) return []
@@ -196,11 +203,16 @@ vendors=official
   align-items flex-start
 
   .bubble
+    max-width 580rpx
     background #fff
     box-shadow 0 2rpx 8rpx rgba(0, 0, 0, 0.05)
 
     .content
       color #333
+      line-height 1.7
+      letter-spacing 0.04em
+      text-align justify
+      text-justify inter-ideograph
 
       .aside-text
         color #8f8f8f

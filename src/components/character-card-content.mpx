@@ -71,7 +71,11 @@
           class="tool-item favorite-tool {{character.isFavorite ? 'active' : ''}}"
           bindtap="handleToggleFavorite"
         >
-          <text class="tool-icon">{{character.isFavorite ? '♥' : '♡'}}</text>
+          <image
+            class="tool-icon-img favorite-icon"
+            src="{{character.isFavorite ? favoriteActiveIcon : favoriteIcon}}"
+            mode="aspectFit"
+          />
           <text class="tool-label">收藏</text>
         </view>
 
@@ -80,14 +84,22 @@
           class="tool-item pin-tool {{character.id === pinnedCharacterId ? 'active' : ''}}"
           bindtap="handlePinToHome"
         >
-          <text class="tool-icon">{{character.id === pinnedCharacterId ? '★' : '☆'}}</text>
+          <image
+            class="tool-icon-img pin-icon"
+            src="{{pinIcon}}"
+            mode="aspectFit"
+          />
           <text class="tool-label">首页</text>
         </view>
         <view
           class="tool-item history-tool {{showHistory ? 'active' : ''}}"
           bindtap="toggleHistory"
         >
-          <text class="tool-icon">◷</text>
+          <image
+            class="tool-icon-img history-icon"
+            src="{{historyIcon}}"
+            mode="aspectFit"
+          />
           <text class="tool-label">历史</text>
         </view>
       </view>
@@ -123,6 +135,11 @@ import { characterApi, conversationApi } from '../common/api'
 import type { Character, ChatMode, Message, CreateConversationResponse, ConversationMessagesResponse, SendMessageResponse } from '../common/types'
 
 type UIMessage = Message & { isLoading?: boolean }
+
+const FAVORITE_ICON = require('../assets/like-white.svg')
+const FAVORITE_ACTIVE_ICON = require('../assets/like.svg')
+const PIN_ICON = require('../assets/stick.svg')
+const HISTORY_ICON = require('../assets/history.svg')
 
 const GREETING_CACHE_KEY = 'greeting_cache'
 const CONVERSATION_CACHE_KEY = 'last_conversation_id'
@@ -162,6 +179,10 @@ createComponent({
   },
 
   data: {
+    favoriteIcon: FAVORITE_ICON,
+    favoriteActiveIcon: FAVORITE_ACTIVE_ICON,
+    pinIcon: PIN_ICON,
+    historyIcon: HISTORY_ICON,
     conversationId: 0,
     messages: [] as UIMessage[],
     inputText: '',
@@ -913,52 +934,53 @@ createComponent({
         flex-direction column
         align-items center
         justify-content center
-        width 92rpx
-        height 92rpx
         gap 6rpx
-        border-radius 28rpx
-        background rgba(255, 255, 255, 0.1)
-        backdrop-filter blur(18rpx)
-        border 1rpx solid rgba(255, 255, 255, 0.16)
-        box-shadow 0 8rpx 24rpx rgba(0, 0, 0, 0.12)
         transition all 0.2s
 
         &:active
           transform scale(0.95)
 
-        .tool-icon
-          font-size 30rpx
-          line-height 1
-          color rgba(255, 255, 255, 0.92)
+        .tool-icon-img
+          width 32rpx
+          height 32rpx
+          display block
+          opacity 0.9
+
+          &.favorite-icon
+            width 32rpx
+            height 32rpx
+
+          &.pin-icon
+            width 32rpx
+            height 32rpx
+            opacity 0.82
+
+          &.history-icon
+            width 32rpx
+            height 32rpx
 
         .tool-label
           font-size 18rpx
           line-height 1
-          color rgba(255, 255, 255, 0.72)
+          color rgba(255, 255, 255, 0.76)
 
         &.favorite-tool.active
-          background rgba(255, 120, 150, 0.18)
-          border-color rgba(255, 184, 202, 0.35)
-
-          .tool-icon
-            color #ff9ab0
+          .tool-icon-img
+            opacity 1
 
           .tool-label
             color rgba(255, 215, 222, 0.92)
 
         &.pin-tool.active
-          background rgba(255, 228, 188, 0.16)
-          border-color rgba(255, 233, 203, 0.36)
-
-          .tool-icon
-            color #ffe2a6
+          .tool-icon-img
+            opacity 1
 
           .tool-label
             color rgba(255, 240, 219, 0.92)
 
         &.history-tool.active
-          background rgba(255, 255, 255, 0.16)
-          border-color rgba(255, 255, 255, 0.3)
+          .tool-icon-img
+            opacity 1
 
           .tool-label
             color rgba(255, 255, 255, 0.9)

@@ -156,7 +156,9 @@ createPage({
       }
 
       try {
-        const officialChars = await characterApi.getOfficialCharacters().catch(() => [])
+        const officialChars = await characterApi.getOfficialCharacters().catch(() => {
+          return [] as Character[]
+        })
 
         // 只使用官方角色列表
         // 后端已返回 isFavorite 和 isPinnedToHome
