@@ -107,16 +107,21 @@
 
     <!-- 输入框 -->
     <view class="input-section">
-      <input
+      <textarea
         class="chat-input"
-        type="text"
         placeholder="输入消息开始聊天..."
+        placeholder-class="chat-input-placeholder"
         value="{{inputText}}"
         bindinput="handleInput"
+        bindlinechange="handleInputLineChange"
         bindconfirm="handleSend"
         confirm-type="send"
+        maxlength="2000"
+        disable-default-padding="{{true}}"
+        auto-height="{{false}}"
+        style="height: {{inputHeightRpx}}rpx;"
         disabled="{{sending}}"
-      />
+      ></textarea>
       <button
         class="send-btn {{inputText ? 'active' : ''}}"
         bindtap="handleSend"
@@ -147,6 +152,10 @@ const HOME_CHARACTER_CACHE_KEY = 'home_character'
 const LAST_CONVERSATION_CHARACTER_KEY = 'last_conversation_character'
 const MESSAGE_CACHE_PREFIX = 'conversation_messages_'
 const HISTORY_PAGE_SIZE = 10
+const INPUT_LINE_HEIGHT_RPX = 42
+const INPUT_VERTICAL_PADDING_RPX = 28
+const DEFAULT_INPUT_HEIGHT_RPX = INPUT_LINE_HEIGHT_RPX + INPUT_VERTICAL_PADDING_RPX
+const MAX_INPUT_LINES = 3
 
 // 每 N 条消息触发一次摘要更新（20条 = 10轮对话）
 const MEMORY_UPDATE_MESSAGE_INTERVAL = 20
@@ -198,7 +207,8 @@ createComponent({
     hasMoreHistory: false,
     isLoadingHistory: false,
     currentScrollTop: 0,
-    scrollIntoView: ''
+    scrollIntoView: '',
+    inputHeightRpx: DEFAULT_INPUT_HEIGHT_RPX
   },
 
   lifetimes: {
@@ -333,7 +343,20 @@ createComponent({
 
     // 输入框内容变化
     handleInput(e: any) {
-      this.inputText = e.detail.value
+      const value = e.detail.value || ''
+      this.inputText = value
+
+      if (!value) {
+        this.inputHeightRpx = DEFAULT_INPUT_HEIGHT_RPX
+      }
+    },
+
+    handleInputLineChange(e: any) {
+      const detail = e?.detail || {}
+      const lineCount = typeof detail.lineCount === 'number' ? detail.lineCount : 1
+      const visibleLines = Math.max(1, Math.min(lineCount, MAX_INPUT_LINES))
+      const nextHeightRpx = INPUT_LINE_HEIGHT_RPX * visibleLines + INPUT_VERTICAL_PADDING_RPX
+      this.inputHeightRpx = nextHeightRpx
     },
 
     handleMessageLongPress(e: any) {
@@ -531,7 +554,10 @@ createComponent({
       }
 
       this.updateMessages([...this.messages, userMessage, pendingAssistantMessage])
-      this.inputText = ''
+      this.batchUpdate({
+        inputText: '',
+        inputHeightRpx: DEFAULT_INPUT_HEIGHT_RPX
+      })
       this.sending = true
       this.scrollToBottom()
 
@@ -561,7 +587,11 @@ createComponent({
           this.triggerMemoryUpdate()
         }
       } catch (err: any) {
-        wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+        wx.showToast({
+          title: err.message || '发送失败',
+          icon: 'none',
+          duration: 3500
+        })
         this.updateMessages(this.messages.filter((item) => !item.isLoading))
       } finally {
         this.sending = false
@@ -988,7 +1018,7 @@ createComponent({
   // 输入框部分
   .input-section
     display flex
-    align-items center
+    align-items flex-end
     gap 16rpx
     background rgba(255, 255, 255, 0.12)
     backdrop-filter blur(20rpx)
@@ -999,15 +1029,18 @@ createComponent({
 
     .chat-input
       flex 1
-      height 64rpx
+      min-height 70rpx
+      max-height 154rpx
       background transparent
       border none
       font-size 28rpx
+      line-height 42rpx
       color #fff
-      padding 0 16rpx
+      padding 14rpx 16rpx
+      box-sizing border-box
 
-      &::placeholder
-        color rgba(255, 255, 255, 0.5)
+    .chat-input-placeholder
+      color rgba(255, 255, 255, 0.5)
 
     .send-btn
       height 64rpx

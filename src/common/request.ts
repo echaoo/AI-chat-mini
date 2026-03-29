@@ -13,6 +13,28 @@ interface RequestOptions {
   needAuth?: boolean
 }
 
+function buildBusinessError(responseData: any, fallbackMessage = '请求失败') {
+  const error = new Error(responseData?.message || fallbackMessage) as Error & {
+    code?: number
+    status?: number
+    data?: any
+  }
+
+  if (typeof responseData?.code === 'number') {
+    error.code = responseData.code
+  }
+
+  if (typeof responseData?.status === 'number') {
+    error.status = responseData.status
+  }
+
+  if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+    error.data = responseData.data
+  }
+
+  return error
+}
+
 /**
  * 统一请求方法
  */
@@ -46,9 +68,25 @@ export function request<T = any>(options: RequestOptions): Promise<T> {
     timeout: REQUEST_TIMEOUT
   }).then((res: any) => {
     if (res.statusCode >= 200 && res.statusCode < 300) {
+      const responseData = res.data
+
+      // 兼容后端 200 + 业务失败 的返回格式
+      if (responseData && typeof responseData === 'object') {
+        const businessStatus = typeof responseData.status === 'number' ? responseData.status : res.statusCode
+        const businessCode = typeof responseData.code === 'number' ? responseData.code : 0
+
+        if (businessStatus === 401 || businessCode === 101 || businessCode === 103) {
+          store.dispatch('handleApiError', { data: { status: 401, code: businessCode, message: responseData.message } })
+          throw buildBusinessError(responseData, '登录已过期')
+        }
+
+        if (responseData.success === false || businessStatus >= 400 || businessCode < 0) {
+          throw buildBusinessError(responseData)
+        }
+      }
+
       // 后端返回格式：{ code, success, status, data }
       // 提取 data 字段
-      const responseData = res.data
       if (responseData && typeof responseData === 'object' && 'data' in responseData) {
         return responseData.data
       }
