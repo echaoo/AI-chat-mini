@@ -112,6 +112,7 @@
         placeholder="输入消息开始聊天..."
         placeholder-class="chat-input-placeholder"
         value="{{inputText}}"
+        focus="{{inputFocused}}"
         bindinput="handleInput"
         bindlinechange="handleInputLineChange"
         bindconfirm="handleSend"
@@ -120,7 +121,6 @@
         disable-default-padding="{{true}}"
         auto-height="{{false}}"
         style="height: {{inputHeightRpx}}rpx;"
-        disabled="{{sending}}"
       ></textarea>
       <button
         class="send-btn {{inputText ? 'active' : ''}}"
@@ -208,7 +208,8 @@ createComponent({
     isLoadingHistory: false,
     currentScrollTop: 0,
     scrollIntoView: '',
-    inputHeightRpx: DEFAULT_INPUT_HEIGHT_RPX
+    inputHeightRpx: DEFAULT_INPUT_HEIGHT_RPX,
+    inputFocused: false
   },
 
   lifetimes: {
@@ -357,6 +358,13 @@ createComponent({
       const visibleLines = Math.max(1, Math.min(lineCount, MAX_INPUT_LINES))
       const nextHeightRpx = INPUT_LINE_HEIGHT_RPX * visibleLines + INPUT_VERTICAL_PADDING_RPX
       this.inputHeightRpx = nextHeightRpx
+    },
+
+    refocusInput() {
+      this.batchUpdate({ inputFocused: false })
+      setTimeout(() => {
+        this.batchUpdate({ inputFocused: true })
+      }, 30)
     },
 
     handleMessageLongPress(e: any) {
@@ -556,7 +564,8 @@ createComponent({
       this.updateMessages([...this.messages, userMessage, pendingAssistantMessage])
       this.batchUpdate({
         inputText: '',
-        inputHeightRpx: DEFAULT_INPUT_HEIGHT_RPX
+        inputHeightRpx: DEFAULT_INPUT_HEIGHT_RPX,
+        inputFocused: false
       })
       this.sending = true
       this.scrollToBottom()
@@ -595,6 +604,7 @@ createComponent({
         this.updateMessages(this.messages.filter((item) => !item.isLoading))
       } finally {
         this.sending = false
+        this.refocusInput()
       }
     },
 
