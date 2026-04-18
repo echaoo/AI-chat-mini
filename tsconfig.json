@@ -18,7 +18,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/h5/*"
+        "src/*"
       ]
     },
     "types": [
@@ -27,10 +27,10 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/h5/**/*.ts",
-    "src/h5/**/*.d.ts",
-    "src/h5/**/*.tsx",
-    "src/h5/**/*.vue",
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue",
     "vite.config.ts"
   ],
   "exclude": [

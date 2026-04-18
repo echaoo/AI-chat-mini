@@ -43,7 +43,7 @@ VITE_REQUEST_TIMEOUT=30000
 ## 目录
 
 ```text
-src/h5/
+src/
 ├── components/
 ├── constants/
 ├── router/
@@ -59,4 +59,4 @@ src/h5/
 
 - 旧小程序代码目前仍保留在仓库中，作为业务逻辑和交互迁移参考。
 - 当前 H5 默认使用测试 token，不包含正式登录流程。
-- 后续如果接入新的登录方式，只需要替换 `src/h5/stores/auth.ts` 和请求拦截器逻辑。
+- 后续如果接入新的登录方式，只需要替换 `src/stores/auth.ts` 和请求拦截器逻辑。
