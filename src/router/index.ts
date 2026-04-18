@@ -32,6 +32,12 @@ const routes = [
     meta: { title: '创建角色' }
   },
   {
+    path: '/me',
+    name: 'me',
+    component: () => import('@/views/MeView.vue'),
+    meta: { title: '我的' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/'
   }
