@@ -1,0 +1,645 @@
+<template>
+  <section class="chat-panel glass-panel">
+    <div class="chat-panel__toolbar">
+      <div>
+        <h2 class="chat-panel__title">{{ character?.name || '聊天中' }}</h2>
+        <p class="chat-panel__subtitle">
+          {{ showHistory ? '完整历史' : '当前对话' }}
+        </p>
+      </div>
+      <div class="chat-panel__toolbar-actions">
+        <button
+          v-if="messages.length > previewLimit"
+          class="ghost-button"
+          type="button"
+          @click="toggleHistory"
+        >
+          {{ showHistory ? '收起历史' : '展开历史' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="loading && messages.length === 0" class="chat-panel__placeholder">
+      正在建立对话...
+    </div>
+
+    <template v-else>
+      <div
+        v-if="!hasStartedChat && greetingMessage"
+        class="chat-panel__intro"
+      >
+        <div v-if="character?.description" class="chat-panel__intro-block">
+          <span class="chat-panel__intro-label">介绍</span>
+          <p>{{ character.description }}</p>
+        </div>
+        <div class="chat-panel__greeting">
+          {{ greetingMessage }}
+        </div>
+      </div>
+
+      <div v-else ref="messageListRef" class="chat-panel__messages">
+        <button
+          v-if="showHistory && hasMoreHistory"
+          class="chip-button chat-panel__load-more"
+          type="button"
+          :disabled="isLoadingHistory"
+          @click="handleLoadMoreHistory"
+        >
+          {{ isLoadingHistory ? '加载中...' : '查看更早消息' }}
+        </button>
+
+        <div v-if="visibleMessages.length === 0" class="chat-panel__placeholder">
+          还没有消息，发一句开始吧。
+        </div>
+
+        <ChatMessageBubble
+          v-for="entry in visibleEntries"
+          :key="entry.message.id"
+          :message="entry.message"
+          :can-rollback="canRollback(entry.message, entry.index)"
+          :can-regenerate="canRegenerate(entry.message, entry.index)"
+          @rollback="handleRollbackMessage(entry.message, entry.index)"
+          @regenerate="handleRegenerateMessage(entry.message, entry.index)"
+        />
+      </div>
+
+      <div class="chat-panel__composer">
+        <textarea
+          v-model="inputText"
+          class="chat-panel__textarea"
+          placeholder="输入消息开始聊天..."
+          maxlength="2000"
+          rows="1"
+          @keydown.enter.exact.prevent="handleSend"
+        />
+        <button
+          class="brand-button chat-panel__send"
+          type="button"
+          :disabled="sending || !trimmedInput"
+          @click="handleSend"
+        >
+          {{ sending ? '发送中' : '发送' }}
+        </button>
+      </div>
+    </template>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import ChatMessageBubble from '@/components/chat/ChatMessageBubble.vue'
+import { MESSAGE_CACHE_PREFIX, STORAGE_KEYS } from '@/constants/storage'
+import { conversationApi } from '@/services/api'
+import { useUiStore } from '@/stores/ui'
+import type {
+  Character,
+  ChatMode,
+  ConversationMessagesResponse,
+  CreateConversationResponse,
+  Message,
+  SendMessageResponse
+} from '@/types'
+import { getHomeCharacterCache, setHomeCharacterCache, setLastConversationCache } from '@/utils/cache'
+import { getJson, setJson, setString } from '@/utils/storage'
+
+type UIMessage = Message & { isLoading?: boolean }
+
+const HISTORY_PAGE_SIZE = 10
+const MEMORY_UPDATE_MESSAGE_INTERVAL = 20
+
+const props = defineProps<{
+  character: Character | null
+  initialConversationId?: number | null
+  chatMode: ChatMode
+}>()
+
+const emit = defineEmits<{
+  (event: 'conversation-ready', payload: { conversationId: number; character: Character }): void
+}>()
+
+const uiStore = useUiStore()
+const messageListRef = ref<HTMLElement | null>(null)
+const conversationId = ref(0)
+const activeCharacterId = ref(0)
+const messages = ref<UIMessage[]>([])
+const inputText = ref('')
+const loading = ref(false)
+const sending = ref(false)
+const showHistory = ref(false)
+const historyPage = ref(1)
+const hasMoreHistory = ref(false)
+const isLoadingHistory = ref(false)
+const initSeed = ref(0)
+const previewLimit = HISTORY_PAGE_SIZE
+
+const trimmedInput = computed(() => inputText.value.trim())
+const hasStartedChat = computed(() => messages.value.length > 1)
+const greetingMessage = computed(() => {
+  if (messages.value[0]?.content) return messages.value[0].content
+  return props.character?.greetingMessage || '你好，我在这里陪你。'
+})
+
+const visibleMessages = computed(() => {
+  if (showHistory.value) return messages.value
+  return messages.value.slice(-previewLimit)
+})
+
+const visibleEntries = computed(() => {
+  const slice = visibleMessages.value
+  const startIndex = showHistory.value ? 0 : Math.max(messages.value.length - slice.length, 0)
+  return slice.map((message, index) => ({
+    message,
+    index: startIndex + index
+  }))
+})
+
+watch(
+  () => [props.character?.id ?? 0, props.initialConversationId ?? 0] as const,
+  ([nextCharacterId, nextConversationId]) => {
+    if (!nextCharacterId) return
+
+    const sameCharacter = nextCharacterId === activeCharacterId.value
+    const sameConversation = (nextConversationId || 0) === conversationId.value
+
+    if (sameCharacter && (sameConversation || (!nextConversationId && conversationId.value))) {
+      return
+    }
+
+    void initConversation(nextCharacterId, nextConversationId)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  rememberConversation()
+  triggerMemoryUpdate()
+})
+
+async function initConversation(nextCharacterId: number, nextConversationId: number) {
+  if (!props.character?.id) return
+
+  const currentInit = ++initSeed.value
+  activeCharacterId.value = nextCharacterId
+  loading.value = true
+  sending.value = false
+  inputText.value = ''
+  showHistory.value = false
+  historyPage.value = 1
+  hasMoreHistory.value = false
+  messages.value = []
+
+  try {
+    if (nextConversationId) {
+      conversationId.value = nextConversationId
+      await loadExistingConversation(currentInit)
+    } else {
+      const cachedHome = getHomeCharacterCache()
+      const cachedConversationId = cachedHome?.characterId === props.character.id ? cachedHome.conversationId || 0 : 0
+
+      if (cachedConversationId) {
+        conversationId.value = cachedConversationId
+        await loadExistingConversation(currentInit)
+      } else {
+        await createNewConversation(currentInit)
+      }
+    }
+  } finally {
+    if (currentInit === initSeed.value) {
+      loading.value = false
+    }
+  }
+}
+
+async function createNewConversation(currentInit: number) {
+  if (!props.character?.id) return
+
+  try {
+    const response: CreateConversationResponse = await conversationApi.createConversation(props.character.id)
+
+    if (currentInit !== initSeed.value) return
+
+    conversationId.value = response.id
+    updateMessages(
+      (response.messages || []).map((item) => ({
+        id: item.id,
+        conversationId: response.id,
+        role: item.role,
+        content: item.content,
+        tokens: null,
+        createdAt: item.createdAt
+      }))
+    )
+    historyPage.value = 1
+    hasMoreHistory.value = false
+    rememberConversation()
+    await scrollToBottom(false)
+  } catch (error) {
+    uiStore.notify((error as Error).message || '初始化失败', 'error')
+  }
+}
+
+async function loadExistingConversation(currentInit: number) {
+  if (!conversationId.value) return
+
+  const cachedMessages = getCachedMessages(conversationId.value)
+  if (cachedMessages.length > 0) {
+    updateMessages(cachedMessages)
+  }
+
+  try {
+    const response: ConversationMessagesResponse = await conversationApi.getConversationMessages(
+      conversationId.value,
+      1,
+      HISTORY_PAGE_SIZE
+    )
+
+    if (currentInit !== initSeed.value) return
+
+    updateMessages(response.messages || [])
+    historyPage.value = 1
+    hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
+    rememberConversation()
+    await scrollToBottom(false)
+  } catch (error) {
+    uiStore.notify((error as Error).message || '加载失败', 'error')
+  }
+}
+
+async function handleSend() {
+  const content = trimmedInput.value
+
+  if (!content || sending.value) return
+
+  if (!conversationId.value) {
+    await createNewConversation(initSeed.value)
+  }
+
+  if (!conversationId.value) return
+
+  const optimisticUser: UIMessage = {
+    id: Date.now(),
+    conversationId: conversationId.value,
+    role: 'user',
+    content,
+    tokens: null,
+    createdAt: new Date().toISOString()
+  }
+
+  const optimisticAssistant: UIMessage = {
+    id: Date.now() + 1,
+    conversationId: conversationId.value,
+    role: 'assistant',
+    content: '',
+    tokens: null,
+    createdAt: new Date().toISOString(),
+    isLoading: true
+  }
+
+  updateMessages([...messages.value, optimisticUser, optimisticAssistant])
+  inputText.value = ''
+  sending.value = true
+  await scrollToBottom()
+
+  try {
+    const response: SendMessageResponse = await conversationApi.sendMessage(
+      conversationId.value,
+      content,
+      props.chatMode
+    )
+
+    const nextMessages = [...messages.value]
+    const loadingIndex = nextMessages.findIndex((item) => item.isLoading)
+
+    if (loadingIndex >= 0) {
+      nextMessages[loadingIndex] = response.assistantMessage
+    } else {
+      nextMessages.push(response.assistantMessage)
+    }
+
+    updateMessages(nextMessages)
+    rememberConversation()
+    await scrollToBottom()
+
+    if (nextMessages.length > 0 && nextMessages.length % MEMORY_UPDATE_MESSAGE_INTERVAL === 0) {
+      triggerMemoryUpdate()
+    }
+  } catch (error) {
+    updateMessages(messages.value.filter((item) => !item.isLoading))
+    uiStore.notify((error as Error).message || '发送失败', 'error', 3200)
+  } finally {
+    sending.value = false
+  }
+}
+
+function toggleHistory() {
+  showHistory.value = !showHistory.value
+
+  if (!showHistory.value) {
+    void scrollToBottom(false)
+  }
+}
+
+function updateMessages(nextMessages: UIMessage[]) {
+  messages.value = nextMessages
+  cacheMessages()
+}
+
+async function handleLoadMoreHistory() {
+  if (!conversationId.value || !hasMoreHistory.value || isLoadingHistory.value) return
+
+  isLoadingHistory.value = true
+  const nextPage = historyPage.value + 1
+
+  try {
+    const response = await conversationApi.getConversationMessages(conversationId.value, nextPage, HISTORY_PAGE_SIZE)
+    const mergedIds = new Set(messages.value.map((item) => item.id))
+    const olderMessages = (response.messages || []).filter((item) => !mergedIds.has(item.id))
+
+    if (olderMessages.length > 0) {
+      updateMessages([...olderMessages, ...messages.value])
+      historyPage.value = nextPage
+    }
+
+    hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
+  } catch (error) {
+    uiStore.notify((error as Error).message || '加载失败', 'error')
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
+function canRegenerate(message: Message, index: number) {
+  if (message.role !== 'assistant') return false
+  if (index !== messages.value.length - 1) return false
+  return Boolean(getRegenerateContent(index))
+}
+
+function canRollback(message: Message, index: number) {
+  if (index !== messages.value.length - 1) return true
+  return message.role !== 'assistant'
+}
+
+function getRegenerateContent(index: number) {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const candidate = messages.value[cursor]
+    if (candidate?.role === 'user') {
+      return candidate.content || ''
+    }
+  }
+
+  return ''
+}
+
+async function handleRegenerateMessage(message: Message, index: number) {
+  if (!conversationId.value || sending.value) return
+
+  const content = getRegenerateContent(index)
+  if (!content) {
+    uiStore.notify('未找到可重新生成的用户消息', 'error')
+    return
+  }
+
+  const original = { ...messages.value[index] }
+  const nextMessages = [...messages.value]
+  nextMessages[index] = { ...original, isLoading: true }
+  updateMessages(nextMessages)
+  sending.value = true
+
+  try {
+    const response = await conversationApi.sendMessage(conversationId.value, content, props.chatMode)
+    const refreshed = [...messages.value]
+    refreshed[index] = response.assistantMessage
+    updateMessages(refreshed)
+    await scrollToBottom()
+  } catch (error) {
+    const rollbackMessages = [...messages.value]
+    rollbackMessages[index] = original
+    updateMessages(rollbackMessages)
+    uiStore.notify((error as Error).message || '重新生成失败', 'error')
+  } finally {
+    sending.value = false
+  }
+}
+
+async function handleRollbackMessage(message: Message, index: number) {
+  if (!conversationId.value) return
+
+  const confirmed = window.confirm(message.role === 'assistant' ? '确认回溯到该回复？' : '确认从这条用户消息开始回溯？')
+  if (!confirmed) return
+
+  try {
+    if (message.role === 'assistant') {
+      if (!canRollback(message, index)) {
+        uiStore.notify('无法回溯最新回复', 'error')
+        return
+      }
+      const nextMessage = messages.value[index + 1]
+      const rollbackMessageId = nextMessage ? nextMessage.id : message.id
+      await conversationApi.rollbackConversation(conversationId.value, rollbackMessageId)
+      const response = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
+      const messageIndex = (response.messages || []).findIndex((item) => item.id === message.id)
+      updateMessages(messageIndex >= 0 ? response.messages.slice(0, messageIndex + 1) : response.messages || [])
+      historyPage.value = 1
+      hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
+      await scrollToBottom(false)
+      return
+    }
+
+    await conversationApi.rollbackConversation(conversationId.value, message.id)
+    const response = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
+    updateMessages(response.messages || [])
+    historyPage.value = 1
+    hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
+    inputText.value = message.content || ''
+    await scrollToBottom(false)
+  } catch (error) {
+    uiStore.notify((error as Error).message || '回溯失败', 'error')
+  }
+}
+
+function cacheMessages() {
+  if (!conversationId.value) return
+
+  setJson(`${MESSAGE_CACHE_PREFIX}${conversationId.value}`, messages.value.slice(-HISTORY_PAGE_SIZE))
+}
+
+function getCachedMessages(targetConversationId: number) {
+  const cached = getJson<UIMessage[]>(`${MESSAGE_CACHE_PREFIX}${targetConversationId}`)
+  return Array.isArray(cached) ? cached : []
+}
+
+async function scrollToBottom(smooth = true) {
+  await nextTick()
+
+  const target = messageListRef.value
+  if (!target) return
+
+  target.scrollTo({
+    top: target.scrollHeight,
+    behavior: smooth ? 'smooth' : 'auto'
+  })
+}
+
+function rememberConversation() {
+  if (!conversationId.value || !props.character) return
+
+  setString(STORAGE_KEYS.lastConversationId, String(conversationId.value))
+  setLastConversationCache({
+    conversationId: conversationId.value,
+    character: props.character,
+    timestamp: Date.now()
+  })
+
+  const homeCache = getHomeCharacterCache()
+  if (homeCache?.characterId === props.character.id) {
+    setHomeCharacterCache({
+      ...homeCache,
+      conversationId: conversationId.value,
+      character: {
+        ...homeCache.character,
+        ...props.character
+      },
+      timestamp: Date.now()
+    })
+  }
+
+  emit('conversation-ready', {
+    conversationId: conversationId.value,
+    character: props.character
+  })
+}
+
+function triggerMemoryUpdate() {
+  if (!conversationId.value || !hasStartedChat.value) return
+
+  conversationApi.updateMemorySummary(conversationId.value).catch(() => {
+    // 静默失败即可，不打断用户操作。
+  })
+}
+</script>
+
+<style scoped lang="scss">
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  min-height: 620px;
+}
+
+.chat-panel__toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-panel__title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.chat-panel__subtitle {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.chat-panel__toolbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chat-panel__intro {
+  display: grid;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.chat-panel__intro-block,
+.chat-panel__greeting {
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  line-height: 1.7;
+}
+
+.chat-panel__intro-block p,
+.chat-panel__greeting {
+  margin: 0;
+}
+
+.chat-panel__intro-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--brand-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.chat-panel__messages {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+  min-height: 320px;
+  max-height: 68vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.chat-panel__load-more {
+  align-self: center;
+}
+
+.chat-panel__placeholder {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.chat-panel__composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.chat-panel__textarea {
+  width: 100%;
+  min-height: 54px;
+  max-height: 160px;
+  border: 1px solid rgba(113, 128, 150, 0.18);
+  border-radius: 22px;
+  padding: 14px 16px;
+  resize: vertical;
+  outline: none;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.chat-panel__send {
+  min-width: 92px;
+}
+
+@media (max-width: 720px) {
+  .chat-panel {
+    min-height: 540px;
+  }
+
+  .chat-panel__toolbar {
+    flex-direction: column;
+  }
+
+  .chat-panel__composer {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-panel__send {
+    width: 100%;
+  }
+}
+</style>

@@ -1,28 +1,40 @@
 {
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "baseUrl": "./",
-    "noImplicitThis": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "moduleResolution": "node",
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "jsx": "preserve",
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
     "lib": [
-      "esnext",
-      "dom",
-      "dom.iterable"
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
     ],
-    "types": [
-    ],
+    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "src/h5/*"
       ]
-    }
+    },
+    "types": [
+      "vite/client"
+    ],
+    "skipLibCheck": true
   },
+  "include": [
+    "src/h5/**/*.ts",
+    "src/h5/**/*.d.ts",
+    "src/h5/**/*.tsx",
+    "src/h5/**/*.vue",
+    "vite.config.ts"
+  ],
   "exclude": [
-    "build",
     "dist",
-    "config",
+    "node_modules"
   ]
 }

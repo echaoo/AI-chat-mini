@@ -1,7 +1,9 @@
-import { mpxConfig } from '@mpxjs/eslint-config'
-export default mpxConfig(
+export default [
   {
-    mpx: true,
-    typescript: true
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'src/**/*.mpx'
+    ]
   }
-)
+]
