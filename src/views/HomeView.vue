@@ -11,8 +11,7 @@
 
       <template v-else-if="homeCharacter">
         <header class="home-stage__topbar">
-          <section class="home-identity glass-panel">
-            <p class="home-identity__label">Current Route</p>
+          <section class="home-identity">
             <h1 class="home-identity__name">{{ homeCharacter.character.name }}</h1>
             <div class="home-identity__affection">
               <span class="home-identity__affection-label">好感度 {{ affectionValue }}</span>
@@ -22,30 +21,23 @@
             </div>
           </section>
 
-          <button class="home-invite" type="button" @click="handleInvite">
-            <span class="home-invite__sub">Side Story</span>
-            <span class="home-invite__main">邀请</span>
-          </button>
+          <button class="home-invite" type="button" @click="handleInvite" aria-label="邀请">邀请 +</button>
         </header>
 
         <main class="home-stage__body">
           <section class="home-drama">
             <div class="home-drama__dialog glass-panel">
-              <p class="home-drama__lead">今日密语</p>
               <p class="home-drama__greeting">{{ greetingText }}</p>
             </div>
 
             <div class="home-drama__actions">
-              <button class="home-action home-action--chat" type="button" @click="startChat('normal')">
-                <span class="home-action__sub">Main Route</span>
-                <span class="home-action__main">开始聊天</span>
-              </button>
               <button class="home-action home-action--sleep" type="button" @click="openFeature('哄睡')">
-                <span class="home-action__sub">Night Whisper</span>
                 <span class="home-action__main">哄睡</span>
               </button>
+              <button class="home-action home-action--chat" type="button" @click="startChat('normal')">
+                <span class="home-action__main">聊天</span>
+              </button>
               <button class="home-action home-action--story" type="button" @click="openFeature('剧情')">
-                <span class="home-action__sub">Branch Story</span>
                 <span class="home-action__main">剧情</span>
               </button>
             </div>
@@ -54,22 +46,19 @@
 
         <nav class="home-dock glass-panel" aria-label="底部导航">
           <button class="home-dock__item" type="button" @click="goToChat">
-            <span class="home-dock__icon">CHAT</span>
             <span class="home-dock__label">聊天</span>
           </button>
           <button class="home-dock__item home-dock__item--active" type="button">
-            <span class="home-dock__icon">HOME</span>
-            <span class="home-dock__label">Home</span>
+            <span class="home-dock__label">首页</span>
           </button>
           <button class="home-dock__item" type="button" @click="goToMe">
-            <span class="home-dock__icon">ME</span>
             <span class="home-dock__label">我的</span>
           </button>
         </nav>
       </template>
 
       <section v-else class="home-empty glass-panel">
-        <p class="home-empty__eyebrow">No Partner Assigned</p>
+        <p class="home-empty__eyebrow">尚未设定首页角色</p>
         <h2>还没有首页角色</h2>
         <p>先去选择一位你想常驻首页的角色，再回来进入乙游式主界面。</p>
         <button class="brand-button" type="button" @click="goToCharacters">去选角色</button>
@@ -293,12 +282,13 @@ function goToMe() {
 
 <style scoped lang="scss">
 .home-view {
-  padding-bottom: calc(132px + env(safe-area-inset-bottom));
+  padding: 0;
 }
 
 .home-stage {
   position: relative;
-  min-height: calc(100vh - 48px);
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
   border-radius: 38px;
   background-size: cover;
@@ -335,6 +325,7 @@ function goToMe() {
 .home-dock {
   position: relative;
   z-index: 1;
+  border-radius: 28px 28px 0 0;
 }
 
 .home-stage__topbar {
@@ -342,31 +333,26 @@ function goToMe() {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 24px 24px 0;
+  padding: 56px 24px 0;
 }
 
 .home-identity {
   width: min(100%, 360px);
-  padding: 20px 22px;
-  background: rgba(24, 18, 24, 0.28);
-  border-color: rgba(255, 242, 234, 0.22);
   color: rgba(255, 244, 239, 0.92);
+  text-shadow: 0 4px 18px rgba(10, 6, 12, 0.36);
 }
 
 .home-identity__label,
 .home-action__sub,
-.home-invite__sub,
 .home-empty__eyebrow,
-.home-drama__lead,
 .home-dock__icon {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
 }
 
 .home-identity__name {
-  margin: 10px 0 16px;
+  margin: 10px 0 14px;
   font-family: 'Songti SC', 'STSong', serif;
   font-size: clamp(30px, 6vw, 44px);
   font-weight: 600;
@@ -387,7 +373,8 @@ function goToMe() {
   position: relative;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  width: min(220px, 52vw);
+  background: rgba(255, 255, 255, 0.22);
   overflow: hidden;
 }
 
@@ -400,77 +387,80 @@ function goToMe() {
 }
 
 .home-invite {
+  width: 60px;
+  height: 60px;
   display: grid;
-  gap: 6px;
-  align-items: center;
-  min-width: 112px;
-  padding: 14px 18px;
-  border-radius: 22px;
-  background: rgba(255, 248, 242, 0.16);
-  border: 1px solid rgba(255, 243, 236, 0.28);
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
   color: rgba(255, 247, 243, 0.94);
-  backdrop-filter: blur(18px);
-  text-align: center;
+  text-shadow: 0 4px 18px rgba(10, 6, 12, 0.36);
 }
 
 .home-invite__main {
   font-family: 'Songti SC', 'STSong', serif;
-  font-size: 24px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
 }
 
 .home-stage__body {
   display: flex;
-  align-items: flex-end;
-  min-height: calc(100vh - 210px);
-  padding: 24px;
+  align-items: center;
+  min-height: 0;
+  height: calc(100% - 148px);
+  padding: 12px 24px 96px;
 }
 
 .home-drama {
   width: min(100%, 520px);
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .home-drama__dialog {
-  padding: 20px 22px;
-  background: linear-gradient(180deg, rgba(255, 249, 244, 0.8), rgba(253, 242, 236, 0.58));
-  border-color: rgba(255, 255, 255, 0.46);
-  color: #3b2731;
+  padding: 22px 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 244, 238, 0.18);
+  color: rgba(255, 247, 242, 0.94);
+  box-shadow: 0 16px 34px rgba(16, 10, 18, 0.18);
 }
 
 .home-drama__greeting {
-  margin: 12px 0 0;
+  margin: 0;
   font-size: 16px;
-  line-height: 1.85;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(8, 5, 10, 0.22);
 }
 
 .home-drama__actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
   gap: 14px;
+  align-items: end;
 }
 
 .home-action {
   display: grid;
-  gap: 8px;
-  min-height: 118px;
-  padding: 18px 18px 20px;
-  border-radius: 28px;
+  place-items: center;
+  min-height: 110px;
+  padding: 18px 16px 20px;
+  border-radius: 30px;
+  background: rgba(255, 246, 241, 0.08);
+  border: 1px solid rgba(255, 242, 236, 0.16);
+  backdrop-filter: blur(18px);
   color: rgba(255, 248, 244, 0.96);
-  text-align: left;
-  box-shadow: 0 20px 48px rgba(25, 16, 20, 0.24);
+  text-align: center;
+  box-shadow: 0 18px 38px rgba(25, 16, 20, 0.16);
 }
 
 .home-action--chat {
-  background: linear-gradient(160deg, rgba(184, 102, 85, 0.9), rgba(94, 46, 41, 0.94));
-}
-
-.home-action--sleep {
-  background: linear-gradient(160deg, rgba(71, 77, 126, 0.88), rgba(31, 37, 71, 0.94));
-}
-
-.home-action--story {
-  background: linear-gradient(160deg, rgba(126, 94, 150, 0.88), rgba(58, 32, 68, 0.94));
+  min-height: 132px;
+  padding: 22px 20px 24px;
+  background: rgba(255, 247, 241, 0.12);
+  border-color: rgba(255, 240, 234, 0.24);
+  box-shadow: 0 22px 44px rgba(25, 16, 20, 0.2);
 }
 
 .home-action__main {
@@ -479,17 +469,18 @@ function goToMe() {
   line-height: 1.1;
 }
 
+.home-action--chat .home-action__main {
+  font-size: clamp(28px, 5.2vw, 36px);
+}
+
 .home-dock {
   position: absolute;
-  left: 50%;
-  right: auto;
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom));
   display: grid;
   grid-template-columns: repeat(3, minmax(88px, 1fr));
   gap: 10px;
-  width: min(calc(100% - 28px), 420px);
-  padding: 12px;
   background: rgba(26, 18, 26, 0.46);
   border-color: rgba(255, 242, 236, 0.16);
 }
@@ -547,18 +538,25 @@ function goToMe() {
   }
 
   .home-stage {
-    min-height: 100vh;
+    height: 100dvh;
+    min-height: 100dvh;
     border-radius: 0;
   }
 
   .home-stage__topbar,
   .home-stage__body {
     padding-inline: 16px;
+    padding-bottom: 164px;
   }
 
   .home-stage__topbar {
-    padding-top: 18px;
+    padding-top: 42px;
     align-items: stretch;
+  }
+
+  .home-stage__body {
+    height: calc(100% - 132px);
+    padding-bottom: 96px;
   }
 
   .home-drama {
@@ -566,16 +564,35 @@ function goToMe() {
   }
 
   .home-drama__actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 10px;
   }
 
   .home-action {
-    min-height: 96px;
+    min-height: 88px;
+    padding: 14px 12px 16px;
+    border-radius: 24px;
+  }
+
+  .home-action--chat {
+    min-height: 104px;
+    padding: 18px 14px 20px;
+  }
+
+  .home-action__sub {
+    font-size: 9px;
+  }
+
+  .home-action__main {
+    font-size: clamp(18px, 4.8vw, 22px);
+  }
+
+  .home-action--chat .home-action__main {
+    font-size: clamp(22px, 5.4vw, 28px);
   }
 
   .home-dock {
-    width: calc(100% - 18px);
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    bottom: calc(env(safe-area-inset-bottom));
   }
 }
 </style>
