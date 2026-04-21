@@ -101,17 +101,20 @@ function handleConversationReady(payload: { conversationId: number; character: C
 
 <style scoped lang="scss">
 .chat-conversation {
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .chat-conversation__inner {
   width: min(100%, 960px);
-  min-height: 100dvh;
+  height: 100%;
   margin: 0 auto;
   padding: 16px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
+  overflow: hidden;
 }
 
 .chat-conversation__nav {
@@ -126,6 +129,7 @@ function handleConversationReady(payload: { conversationId: number; character: C
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 18px 48px rgba(15, 31, 54, 0.08);
   backdrop-filter: blur(18px);
+  flex-shrink: 0;
 }
 
 .chat-conversation__title {
@@ -142,6 +146,7 @@ function handleConversationReady(payload: { conversationId: number; character: C
 
 .chat-conversation__content {
   min-height: 0;
+  overflow: hidden;
 }
 
 .chat-conversation__panel {

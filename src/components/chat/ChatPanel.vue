@@ -599,6 +599,7 @@ function triggerMemoryUpdate() {
   box-shadow: 0 12px 24px rgba(16, 29, 48, 0.06);
   line-height: 1.7;
   white-space: pre-wrap;
+  flex-shrink: 0;
 }
 
 .chat-panel__messages {
@@ -630,6 +631,9 @@ function triggerMemoryUpdate() {
   align-items: flex-end;
   padding: 0 20px 20px;
   margin-top: auto;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(113, 128, 150, 0.12);
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .chat-panel__textarea {
