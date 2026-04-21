@@ -1,11 +1,15 @@
 <template>
   <section class="chat-panel glass-panel">
-    <div class="chat-panel__toolbar">
-      <div>
-        <h2 class="chat-panel__title">{{ character?.name || '聊天中' }}</h2>
-        <p class="chat-panel__subtitle">
-          {{ showHistory ? '完整历史' : '当前对话' }}
-        </p>
+    <div v-if="hasToolbar" class="chat-panel__toolbar">
+      <div class="chat-panel__identity">
+        <div class="chat-panel__avatar">
+          <img v-if="character?.avatarUrl" :src="character.avatarUrl" :alt="character?.name || '聊天对象'" />
+          <span v-else>{{ avatarFallback }}</span>
+        </div>
+        <div class="chat-panel__identity-copy">
+          <h2 class="chat-panel__title">{{ character?.name || '聊天中' }}</h2>
+          <p class="chat-panel__subtitle">{{ toolbarSubtitle }}</p>
+        </div>
       </div>
       <div class="chat-panel__toolbar-actions">
         <button
@@ -26,20 +30,14 @@
     <template v-else>
       <div
         v-if="!hasStartedChat && greetingMessage"
-        class="chat-panel__intro"
+        class="chat-panel__welcome"
       >
-        <div v-if="character?.description" class="chat-panel__intro-block">
-          <span class="chat-panel__intro-label">介绍</span>
-          <p>{{ character.description }}</p>
-        </div>
-        <div class="chat-panel__greeting">
-          {{ greetingMessage }}
-        </div>
+        {{ greetingMessage }}
       </div>
 
       <div v-else ref="messageListRef" class="chat-panel__messages">
         <button
-          v-if="showHistory && hasMoreHistory"
+          v-if="shouldShowAllMessages && hasMoreHistory"
           class="chip-button chat-panel__load-more"
           type="button"
           :disabled="isLoadingHistory"
@@ -111,6 +109,7 @@ const props = defineProps<{
   character: Character | null
   initialConversationId?: number | null
   chatMode: ChatMode
+  showToolbar?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -132,15 +131,19 @@ const isLoadingHistory = ref(false)
 const initSeed = ref(0)
 const previewLimit = HISTORY_PAGE_SIZE
 
+const hasToolbar = computed(() => props.showToolbar !== false)
 const trimmedInput = computed(() => inputText.value.trim())
 const hasStartedChat = computed(() => messages.value.length > 1)
 const greetingMessage = computed(() => {
   if (messages.value[0]?.content) return messages.value[0].content
   return props.character?.greetingMessage || '你好，我在这里陪你。'
 })
+const avatarFallback = computed(() => (props.character?.name || '聊').slice(0, 1))
+const shouldShowAllMessages = computed(() => !hasToolbar.value || showHistory.value)
+const toolbarSubtitle = computed(() => (shouldShowAllMessages.value ? '全部消息' : '最近消息'))
 
 const visibleMessages = computed(() => {
-  if (showHistory.value) return messages.value
+  if (shouldShowAllMessages.value) return messages.value
   return messages.value.slice(-previewLimit)
 })
 
@@ -522,21 +525,57 @@ function triggerMemoryUpdate() {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 18px;
-  min-height: 620px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 24px 60px rgba(15, 31, 54, 0.1);
 }
 
 .chat-panel__toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.chat-panel__identity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.chat-panel__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #efc8b6 0%, #d7e6fa 100%);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--brand-deep);
+}
+
+.chat-panel__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.chat-panel__identity-copy {
+  min-width: 0;
 }
 
 .chat-panel__title {
   margin: 0;
   font-size: 20px;
+  line-height: 1.2;
 }
 
 .chat-panel__subtitle {
@@ -551,32 +590,15 @@ function triggerMemoryUpdate() {
   flex-wrap: wrap;
 }
 
-.chat-panel__intro {
-  display: grid;
-  gap: 16px;
-  margin-top: 6px;
-}
-
-.chat-panel__intro-block,
-.chat-panel__greeting {
+.chat-panel__welcome {
+  margin: 18px 20px 0;
+  max-width: min(100%, 540px);
   border-radius: 24px;
   padding: 18px;
-  background: rgba(255, 255, 255, 0.82);
+  background: #fff;
+  box-shadow: 0 12px 24px rgba(16, 29, 48, 0.06);
   line-height: 1.7;
-}
-
-.chat-panel__intro-block p,
-.chat-panel__greeting {
-  margin: 0;
-}
-
-.chat-panel__intro-label {
-  display: inline-block;
-  margin-bottom: 8px;
-  color: var(--brand-deep);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  white-space: pre-wrap;
 }
 
 .chat-panel__messages {
@@ -584,10 +606,9 @@ function triggerMemoryUpdate() {
   flex-direction: column;
   gap: 18px;
   flex: 1;
-  min-height: 320px;
-  max-height: 68vh;
+  min-height: 0;
   overflow: auto;
-  padding-right: 4px;
+  padding: 18px 20px 4px;
 }
 
 .chat-panel__load-more {
@@ -607,6 +628,8 @@ function triggerMemoryUpdate() {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: flex-end;
+  padding: 0 20px 20px;
+  margin-top: auto;
 }
 
 .chat-panel__textarea {
@@ -614,9 +637,9 @@ function triggerMemoryUpdate() {
   min-height: 54px;
   max-height: 160px;
   border: 1px solid rgba(113, 128, 150, 0.18);
-  border-radius: 22px;
+  border-radius: 18px;
   padding: 14px 16px;
-  resize: vertical;
+  resize: none;
   outline: none;
   background: rgba(255, 255, 255, 0.9);
 }
@@ -627,11 +650,12 @@ function triggerMemoryUpdate() {
 
 @media (max-width: 720px) {
   .chat-panel {
-    min-height: 540px;
+    min-height: 0;
   }
 
   .chat-panel__toolbar {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .chat-panel__composer {

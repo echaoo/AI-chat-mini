@@ -16,7 +16,7 @@ const routes = [
   {
     path: '/chat',
     name: 'chat',
-    component: () => import('@/views/ChatView.vue'),
+    component: () => import('@/views/ChatConversationView.vue'),
     meta: { title: '聊天' }
   },
   {
