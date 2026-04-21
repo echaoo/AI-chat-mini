@@ -5,8 +5,8 @@
       <div class="home-stage__mist home-stage__mist--right" />
       <div class="home-stage__grain" />
 
-      <div v-if="loading" class="home-loading glass-panel">
-        正在唤醒今日陪伴剧情...
+      <div v-if="loading" class="home-loading" aria-label="加载中">
+        <span class="home-loading__ring" />
       </div>
 
       <template v-else-if="homeCharacter">
@@ -27,6 +27,11 @@
         <main class="home-stage__body">
           <section class="home-drama">
             <div class="home-drama__dialog glass-panel">
+              <div
+                class="home-drama__avatar"
+                :style="messageAvatarStyle"
+                aria-hidden="true"
+              />
               <p class="home-drama__greeting">{{ greetingText }}</p>
             </div>
 
@@ -110,6 +115,18 @@ const heroStyle = computed(() => {
       'radial-gradient(circle at top, rgba(255, 226, 210, 0.22), transparent 32%)',
       `url(${cover})`
     ].join(', ')
+  }
+})
+
+const messageAvatarStyle = computed(() => {
+  const cover = getCharacterCover(homeCharacter.value?.character)
+
+  if (!cover) {
+    return {}
+  }
+
+  return {
+    backgroundImage: `url(${cover})`
   }
 })
 
@@ -419,15 +436,35 @@ function goToMe() {
 }
 
 .home-drama__dialog {
-  padding: 22px 24px;
+  position: relative;
+  padding: 22px 24px 22px 30px;
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 244, 238, 0.18);
   color: rgba(255, 247, 242, 0.94);
   box-shadow: 0 16px 34px rgba(16, 10, 18, 0.18);
+  overflow: visible;
+}
+
+.home-drama__avatar {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, rgba(255, 239, 230, 0.88), rgba(238, 205, 188, 0.74));
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgba(255, 245, 240, 0.82);
+  box-shadow:
+    0 0 0 10px rgba(255, 247, 242, 0.08),
+    0 10px 22px rgba(15, 9, 15, 0.2);
 }
 
 .home-drama__greeting {
   margin: 0;
+  padding-top: 12px;
   font-size: 16px;
   line-height: 1.9;
   letter-spacing: 0.02em;
@@ -505,8 +542,26 @@ function goToMe() {
   letter-spacing: 0.04em;
 }
 
-.home-empty,
 .home-loading {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 520px);
+  min-height: 220px;
+  margin: 120px auto 0;
+  display: grid;
+  place-items: center;
+}
+
+.home-loading__ring {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 244, 238, 0.26);
+  border-top-color: rgba(255, 244, 238, 0.92);
+  animation: home-loading-spin 0.9s linear infinite;
+}
+
+.home-empty {
   position: relative;
   z-index: 1;
   width: min(100%, 520px);
@@ -530,6 +585,12 @@ function goToMe() {
   margin: 14px 0 22px;
   line-height: 1.8;
   color: var(--text-secondary);
+}
+
+@keyframes home-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 780px) {
@@ -572,6 +633,13 @@ function goToMe() {
     min-height: 88px;
     padding: 14px 12px 16px;
     border-radius: 24px;
+  }
+
+  .home-drama__avatar {
+    top: -12px;
+    left: -10px;
+    width: 42px;
+    height: 42px;
   }
 
   .home-action--chat {
