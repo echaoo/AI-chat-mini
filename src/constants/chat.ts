@@ -3,39 +3,32 @@ import type { ChatMode, ChatModelId } from '@/types'
 export const CHAT_MODE_OPTIONS: Array<{
   value: ChatMode
   label: string
-  description: string
 }> = [
   {
     value: 'normal',
-    label: '默认模式',
-    description: '更自然、稳定，适合日常陪伴和慢节奏聊天。'
+    label: '默认模式'
   },
   {
     value: 'romantic',
-    label: '心动模式',
-    description: '更有暧昧感和情绪张力，适合亲密氛围。'
+    label: '心动模式'
   }
 ]
 
 export const CHAT_MODEL_OPTIONS: Array<{
   value: ChatModelId
   label: string
-  description: string
 }> = [
   {
-    value: 'default',
-    label: '标准模型',
-    description: '平衡回复速度和表达稳定性，适合作为默认选择。'
+    value: 'roleplay',
+    label: '角色扮演模型'
   },
   {
-    value: 'empathy',
-    label: '共情模型',
-    description: '偏重情绪理解和安抚感，适合更细腻的陪伴体验。'
+    value: 'gpt',
+    label: 'GPT'
   },
   {
-    value: 'story',
-    label: '剧情模型',
-    description: '偏重展开感和代入感，适合更有戏剧性的互动。'
+    value: 'deepseek',
+    label: 'DeepSeek'
   }
 ]
 
@@ -47,7 +40,7 @@ export function resolveChatMode(value: unknown, fallback: ChatMode = 'normal') {
   return VALID_CHAT_MODES.has(raw as ChatMode) ? (raw as ChatMode) : fallback
 }
 
-export function resolveChatModelId(value: unknown, fallback: ChatModelId = 'default') {
+export function resolveChatModelId(value: unknown, fallback: ChatModelId = 'roleplay') {
   const raw = Array.isArray(value) ? value[0] : value
   return VALID_CHAT_MODELS.has(raw as ChatModelId) ? (raw as ChatModelId) : fallback
 }
@@ -57,5 +50,5 @@ export function getChatModeLabel(mode: ChatMode) {
 }
 
 export function getChatModelLabel(modelId: ChatModelId) {
-  return CHAT_MODEL_OPTIONS.find((item) => item.value === modelId)?.label || '标准模型'
+  return CHAT_MODEL_OPTIONS.find((item) => item.value === modelId)?.label || '角色扮演模型'
 }

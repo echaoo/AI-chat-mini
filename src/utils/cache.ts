@@ -24,7 +24,7 @@ export interface ChatSettingsCache {
 
 const DEFAULT_CHAT_SETTINGS: ChatSettingsCache = {
   chatMode: 'normal',
-  modelId: 'default',
+  modelId: 'roleplay',
   updatedAt: 0
 }
 

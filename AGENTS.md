@@ -7,6 +7,8 @@ Repository-specific instructions for AI assistants.
 - Keep request and API logic in `src/services/`; avoid scattering network calls across views.
 - Do not move state into Pinia unless the state is actually shared across screens or features.
 - Preserve the existing route structure unless the task requires route changes.
+- Keep new UI and visual changes consistent with the existing design language; do not introduce a disconnected style unless the user explicitly asks for it.
+- For settings/forms, keep layout spacing on the 8px / 16px / 24px scale; if a screen must match an existing UI like the chat header, reuse that existing spacing exactly.
 - Avoid adding new dependencies unless they are clearly needed.
 - No error handling for impossible scenarios.
 - Unless the user explicitly asks for it, do not add data type compatibility branches or defensive handling for alternate payload shapes; assume the agreed contract is correct.

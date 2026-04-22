@@ -151,5 +151,5 @@ export interface PinnedCharacterSummary {
 }
 
 export type ChatMode = 'normal' | 'romantic'
-export type ChatModelId = 'default' | 'empathy' | 'story'
+export type ChatModelId = 'roleplay' | 'gpt' | 'deepseek'
 export type BackgroundType = 'chat' | 'sleep' | 'companion'

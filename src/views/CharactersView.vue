@@ -1,22 +1,15 @@
 <template>
   <div class="characters-view">
-    <header class="characters-view__nav-shell">
-      <div class="characters-view__nav-inner">
-        <div class="characters-view__nav">
-          <button class="characters-view__back-button" type="button" aria-label="返回" @click="goBack">
-            <img :src="backIcon" alt="" />
-          </button>
+    <header class="characters-view__nav">
+      <button class="characters-view__back-button" type="button" aria-label="返回" @click="goBack">
+        <img :src="backIcon" alt="" />
+      </button>
 
-          <div class="characters-view__summary">
-            <p class="characters-view__label">{{ pageTitle }}</p>
-            <h1 class="characters-view__title">{{ currentCharacter?.name || pageTitle }}</h1>
-          </div>
-
-          <div class="characters-view__counter" aria-label="当前角色进度">
-            {{ progressLabel }}
-          </div>
-        </div>
+      <div class="characters-view__summary">
+        <h1 class="characters-view__title">{{ currentCharacter?.name || pageTitle }}</h1>
       </div>
+
+      <div class="characters-view__nav-spacer" aria-hidden="true" />
     </header>
 
     <section v-if="loading" class="characters-view__state-shell">
@@ -47,24 +40,27 @@
         <div class="characters-view__slide-inner">
           <article class="characters-view__card" :style="getCardStyle(character)">
             <div class="characters-view__scrim" />
-            <div class="characters-view__content">
-              <p class="characters-view__watermark">AI 角色</p>
 
-              <div class="characters-view__badges">
-                <span class="characters-view__badge">{{ character.isOfficial ? '官方角色' : '自定义角色' }}</span>
-                <span v-if="character.isFavorite" class="characters-view__badge">已收藏</span>
-                <span v-if="character.isPinnedToHome" class="characters-view__badge">首页角色</span>
+            <div class="characters-view__content">
+              <div class="characters-view__topbar">
+                <p class="characters-view__watermark">AI 角色</p>
+
+                <div class="characters-view__chips">
+                  <span class="characters-view__chip">{{ progressText(index) }}</span>
+                  <span class="characters-view__chip">{{ character.isOfficial ? '官方角色' : '自定义角色' }}</span>
+                  <span v-if="character.isFavorite" class="characters-view__chip">已收藏</span>
+                </div>
               </div>
 
               <div class="characters-view__main">
-                <div class="characters-view__intro">
-                  <strong>介绍</strong>
+                <section class="characters-view__intro-panel">
+                  <div class="characters-view__intro-title">介绍</div>
                   <p>{{ getIntroText(character) }}</p>
-                </div>
+                </section>
 
-                <div class="characters-view__story">
-                  {{ getStoryText(character) }}
-                </div>
+                <section class="characters-view__story-panel">
+                  <p>{{ getStoryText(character) }}</p>
+                </section>
 
                 <footer class="characters-view__footer">
                   <div class="characters-view__identity">
@@ -72,17 +68,9 @@
                     <p>{{ getMetaText(character) }}</p>
                   </div>
 
-                  <div class="characters-view__actions">
-                    <button class="characters-view__ghost-action" type="button" @click="scrollToIndex(index - 1, true)">
-                      上一个
-                    </button>
-                    <button class="characters-view__ghost-action" type="button" @click="scrollToIndex(index + 1, true)">
-                      下一个
-                    </button>
-                    <button class="characters-view__invite-button" type="button" @click="openCharacter(character)">
-                      邀请聊天
-                    </button>
-                  </div>
+                  <button class="characters-view__invite-button" type="button" @click="openCharacter(character)">
+                    邀请聊天
+                  </button>
                 </footer>
               </div>
             </div>
@@ -90,10 +78,6 @@
         </div>
       </section>
     </main>
-
-    <div v-if="orderedCharacters.length > 1 && !loading" class="characters-view__hint">
-      上下滑动切换角色
-    </div>
   </div>
 </template>
 
@@ -105,7 +89,6 @@ import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Character } from '@/types'
 import { getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
-import { getCharacterCover } from '@/utils/character'
 
 const route = useRoute()
 const router = useRouter()
@@ -145,10 +128,6 @@ const orderedCharacters = computed(() => {
 })
 const currentCharacter = computed(() => orderedCharacters.value[currentIndex.value] || null)
 const pageTitle = computed(() => (isInviteEntry.value ? '邀请角色' : '选择角色'))
-const progressLabel = computed(() => {
-  if (!orderedCharacters.value.length) return '--'
-  return `${currentIndex.value + 1}/${orderedCharacters.value.length}`
-})
 
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
@@ -238,18 +217,29 @@ function goBack() {
   router.push({ name: 'home' })
 }
 
+function progressText(index: number) {
+  return `${index + 1}/${orderedCharacters.value.length}`
+}
+
+function getCardCover(character: Character) {
+  return character.companionBackgroundUrl || character.chatBackgroundUrl || character.avatarUrl || ''
+}
+
 function getCardStyle(character: Character) {
-  const cover = getCharacterCover(character)
+  const cover = getCardCover(character)
 
   if (!cover) {
     return {
-      background:
-        'radial-gradient(circle at top, rgba(99, 120, 164, 0.3), transparent 34%), linear-gradient(180deg, #18202d 0%, #0b0d12 100%)'
+      backgroundImage:
+        'radial-gradient(circle at top, rgba(96, 118, 163, 0.34), transparent 30%), linear-gradient(180deg, #313a4b 0%, #121720 42%, #080a0f 100%)'
     }
   }
 
   return {
-    backgroundImage: `linear-gradient(180deg, rgba(7, 10, 18, 0.18) 0%, rgba(7, 10, 18, 0.42) 48%, rgba(7, 10, 18, 0.84) 100%), url(${cover})`
+    backgroundImage: [
+      'linear-gradient(180deg, rgba(8, 10, 16, 0.08) 0%, rgba(8, 10, 16, 0.24) 34%, rgba(8, 10, 16, 0.56) 72%, rgba(8, 10, 16, 0.82) 100%)',
+      `url(${cover})`
+    ].join(', ')
   }
 }
 
@@ -272,6 +262,7 @@ function getMetaText(character: Character) {
   const parts = [
     character.organization,
     character.speciesType,
+    character.isPinnedToHome ? '首页角色' : '',
     character.isOfficial ? '官方设定' : '自定义设定'
   ].filter(Boolean)
 
@@ -296,39 +287,28 @@ function openCharacter(character: Character) {
   min-height: 100vh;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at top, rgba(43, 51, 74, 0.48), transparent 36%),
-    linear-gradient(180deg, #14171f 0%, #0a0c11 52%, #040506 100%);
+    radial-gradient(circle at top, rgba(38, 47, 71, 0.5), transparent 34%),
+    linear-gradient(180deg, #151922 0%, #0b0d12 54%, #050607 100%);
   color: rgba(255, 255, 255, 0.96);
 }
 
-.characters-view__nav-shell {
+.characters-view__nav {
   position: fixed;
   inset: 0 0 auto;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.characters-view__nav-inner,
-.characters-view__slide-inner {
-  width: min(100%, 560px);
-  margin: 0 auto;
-}
-
-.characters-view__nav {
-  pointer-events: auto;
+  z-index: 12;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 64px;
-  padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.12));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(24px) saturate(130%);
 }
 
 .characters-view__back-button,
-.characters-view__counter {
+.characters-view__nav-spacer {
   width: 52px;
   height: 52px;
   flex-shrink: 0;
@@ -353,15 +333,6 @@ function openCharacter(character: Character) {
   min-width: 0;
 }
 
-.characters-view__label {
-  margin: 0 0 4px;
-  text-align: center;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.66);
-}
-
 .characters-view__title {
   margin: 0;
   text-align: center;
@@ -375,22 +346,13 @@ function openCharacter(character: Character) {
   text-overflow: ellipsis;
 }
 
-.characters-view__counter {
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-}
-
 .characters-view__scroller {
   height: 100vh;
   height: 100dvh;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
+  overscroll-behavior-y: contain;
 }
 
 .characters-view__scroller::-webkit-scrollbar {
@@ -407,29 +369,30 @@ function openCharacter(character: Character) {
 .characters-view__slide-inner {
   min-height: 100vh;
   min-height: 100dvh;
-  padding: calc(env(safe-area-inset-top) + 84px) 16px calc(env(safe-area-inset-bottom) + 24px);
-  display: flex;
+  padding: calc(env(safe-area-inset-top)) 0 calc(env(safe-area-inset-bottom) + 24px);
+  display: grid;
+  place-items: stretch center;
 }
 
 .characters-view__card {
   position: relative;
-  flex: 1;
-  min-height: 0;
+  width: min(100%, 560px);
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: 620px;
   overflow: hidden;
-  border-radius: 34px;
   background-color: #11151d;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.3);
 }
 
 .characters-view__scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.14) 30%, rgba(0, 0, 0, 0.48) 72%, rgba(0, 0, 0, 0.7) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 16%),
+    linear-gradient(180deg, rgba(6, 8, 12, 0.02), rgba(6, 8, 12, 0.1) 28%, rgba(6, 8, 12, 0.44) 70%, rgba(6, 8, 12, 0.76) 100%);
 }
 
 .characters-view__content {
@@ -441,33 +404,41 @@ function openCharacter(character: Character) {
   padding: 22px 18px 20px;
 }
 
+.characters-view__topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .characters-view__watermark {
   margin: 0;
   width: 18px;
   font-size: 12px;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: 0.18em;
   color: rgba(255, 255, 255, 0.72);
   writing-mode: vertical-rl;
 }
 
-.characters-view__badges {
-  margin-top: 12px;
+.characters-view__chips {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.characters-view__badge {
+.characters-view__chip {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  background: rgba(8, 12, 20, 0.58);
+  background: rgba(9, 12, 18, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.94);
 }
 
 .characters-view__main {
@@ -476,43 +447,47 @@ function openCharacter(character: Character) {
   gap: 16px;
 }
 
-.characters-view__intro {
+.characters-view__intro-panel {
   padding: 18px 18px 16px;
   border-radius: 24px;
-  background: rgba(6, 8, 12, 0.84);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2);
+  background: rgba(5, 7, 11, 0.82);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(14px);
 }
 
-.characters-view__intro strong {
-  display: inline-block;
+.characters-view__intro-title {
   margin-bottom: 10px;
   font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-.characters-view__intro p,
-.characters-view__story {
+.characters-view__intro-panel p,
+.characters-view__story-panel p {
   margin: 0;
   line-height: 1.75;
 }
 
-.characters-view__intro p {
+.characters-view__intro-panel p {
   display: -webkit-box;
   overflow: hidden;
   color: rgba(255, 255, 255, 0.94);
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
 }
 
-.characters-view__story {
+.characters-view__story-panel {
   padding: 22px 20px;
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.92);
-  color: #202531;
-  font-size: clamp(17px, 3.8vw, 20px);
+  color: #1d2230;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+}
+
+.characters-view__story-panel p {
   display: -webkit-box;
   overflow: hidden;
+  font-size: clamp(17px, 3.8vw, 20px);
   -webkit-line-clamp: 8;
   -webkit-box-orient: vertical;
 }
@@ -539,30 +514,14 @@ function openCharacter(character: Character) {
   margin: 10px 0 0;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.76);
+  line-height: 1.6;
 }
 
-.characters-view__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.characters-view__ghost-action,
 .characters-view__invite-button {
   min-height: 48px;
+  flex-shrink: 0;
+  padding: 0 22px;
   border-radius: 999px;
-  padding: 0 18px;
-}
-
-.characters-view__ghost-action {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.characters-view__invite-button {
   background: rgba(255, 255, 255, 0.94);
   color: #12151d;
   font-weight: 700;
@@ -607,17 +566,23 @@ function openCharacter(character: Character) {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.76);
   backdrop-filter: blur(18px);
 }
 
-@media (max-width: 420px) {
-  .characters-view__slide-inner {
-    padding-inline: 12px;
+@media (max-width: 640px) {
+  .characters-view__card {
+    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 116px);
+  }
+}
+
+@media (max-width: 480px) {
+  .characters-view__content {
+    padding: 18px 16px 18px;
   }
 
-  .characters-view__content {
-    padding-inline: 16px;
+  .characters-view__story-panel p {
+    -webkit-line-clamp: 7;
   }
 
   .characters-view__footer {
@@ -625,9 +590,8 @@ function openCharacter(character: Character) {
     flex-direction: column;
   }
 
-  .characters-view__actions {
+  .characters-view__invite-button {
     width: 100%;
-    justify-content: flex-start;
   }
 }
 </style>

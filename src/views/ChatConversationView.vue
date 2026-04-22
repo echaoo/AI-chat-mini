@@ -7,7 +7,6 @@
         </button>
         <div class="chat-conversation__summary">
           <h1 class="chat-conversation__title">{{ currentCharacter?.name || '聊天' }}</h1>
-          <p class="chat-conversation__meta">{{ currentModeLabel }} · {{ currentModelLabel }}</p>
         </div>
         <button class="chat-conversation__icon-button" type="button" aria-label="设置" @click="openSettings">
           <img :src="settingIcon" alt="" />
@@ -47,7 +46,6 @@ import { useRoute, useRouter } from 'vue-router'
 import backIcon from '@/assets/chat/back.png'
 import settingIcon from '@/assets/chat/setting.png'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
-import { getChatModeLabel, getChatModelLabel } from '@/constants/chat'
 import type { Character } from '@/types'
 import { getChatEntryCharacterCache, getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 import { getCharacterCover } from '@/utils/character'
@@ -60,8 +58,6 @@ const panelConversationId = ref<number | null>(null)
 const chatSettings = ref(getChatSettingsCache())
 const loading = ref(true)
 const error = ref('')
-const currentModeLabel = computed(() => getChatModeLabel(chatSettings.value.chatMode))
-const currentModelLabel = computed(() => getChatModelLabel(chatSettings.value.modelId))
 const backgroundStyle = computed(() => {
   const cover = getCharacterCover(currentCharacter.value)
 
@@ -207,18 +203,6 @@ function handleConversationReady(payload: { conversationId: number; character: C
   text-overflow: ellipsis;
 }
 
-.chat-conversation__meta {
-  margin: 4px 0 0;
-  text-align: center;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.78);
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.22);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .chat-conversation__content {
   min-height: 0;
   overflow: hidden;
@@ -284,10 +268,6 @@ function handleConversationReady(payload: { conversationId: number; character: C
 
   .chat-conversation__title {
     font-size: 16px;
-  }
-
-  .chat-conversation__meta {
-    font-size: 11px;
   }
 
   .chat-conversation__content {
