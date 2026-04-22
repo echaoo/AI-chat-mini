@@ -54,7 +54,7 @@ import ViewHeader from '@/components/common/ViewHeader.vue'
 import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Character } from '@/types'
-import { setChatEntryCharacterCache } from '@/utils/cache'
+import { getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 
 const router = useRouter()
 const uiStore = useUiStore()
@@ -93,7 +93,8 @@ function openCharacter(character: Character) {
   router.push({
     name: 'chat',
     query: {
-      characterId: String(character.id)
+      characterId: String(character.id),
+      mode: getChatSettingsCache().chatMode
     }
   })
 }

@@ -39,7 +39,7 @@
               <button class="home-action home-action--sleep" type="button" @click="openFeature('哄睡')">
                 <span class="home-action__main">哄睡</span>
               </button>
-              <button class="home-action home-action--chat" type="button" @click="startChat('normal')">
+              <button class="home-action home-action--chat" type="button" @click="startChat()">
                 <span class="home-action__main">聊天</span>
               </button>
               <button class="home-action home-action--story" type="button" @click="openFeature('剧情')">
@@ -81,6 +81,7 @@ import { useUiStore } from '@/stores/ui'
 import type { Character, ChatMode, PinnedCharacterSummary } from '@/types'
 import {
   clearHomeCharacterCache,
+  getChatSettingsCache,
   getGreetingCache,
   getHomeCharacterCache,
   setChatEntryCharacterCache,
@@ -237,7 +238,7 @@ async function fetchAndCacheNewGreeting() {
   }
 }
 
-function startChat(mode: ChatMode) {
+function startChat(mode: ChatMode = getChatSettingsCache().chatMode) {
   if (!homeCharacter.value) {
     goToCharacters()
     return
@@ -265,7 +266,7 @@ function handleInvite() {
 }
 
 function goToChat() {
-  startChat('normal')
+  startChat()
 }
 
 function goToCharacters() {
