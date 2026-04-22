@@ -1,20 +1,20 @@
 :root {
   color-scheme: light;
   font-family: 'PingFang SC', 'Noto Sans SC', 'Helvetica Neue', sans-serif;
-  --bg-page: #f4efe7;
-  --bg-panel: rgba(255, 252, 247, 0.78);
-  --bg-panel-strong: rgba(255, 252, 247, 0.92);
-  --bg-dark: rgba(15, 22, 32, 0.72);
-  --text-primary: #1a2433;
-  --text-secondary: #5d6878;
-  --text-light: rgba(255, 255, 255, 0.86);
-  --line-soft: rgba(113, 128, 150, 0.16);
-  --brand: #c96d4b;
-  --brand-deep: #7d3f2d;
-  --brand-soft: #f1d6c9;
-  --danger: #b44545;
-  --shadow-soft: 0 18px 60px rgba(15, 31, 54, 0.12);
-  --shadow-card: 0 14px 36px rgba(15, 31, 54, 0.14);
+  --bg-page: #f3f3f1;
+  --bg-panel: rgba(255, 255, 255, 0.8);
+  --bg-panel-strong: rgba(255, 255, 255, 0.94);
+  --bg-dark: rgba(18, 18, 18, 0.82);
+  --text-primary: #111111;
+  --text-secondary: #6c6c6c;
+  --text-light: rgba(255, 255, 255, 0.94);
+  --line-soft: rgba(17, 17, 17, 0.1);
+  --brand: #111111;
+  --brand-deep: #000000;
+  --brand-soft: #ececec;
+  --danger: #a63f3f;
+  --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 14px 36px rgba(0, 0, 0, 0.12);
 }
 
 * {
@@ -30,9 +30,9 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(255, 215, 181, 0.9), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(220, 229, 248, 0.95), transparent 34%),
-    linear-gradient(180deg, #f7f3ee 0%, #f2ece4 100%);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(221, 221, 221, 0.6), transparent 30%),
+    linear-gradient(180deg, #f7f7f5 0%, #efefec 100%);
   color: var(--text-primary);
 }
 
@@ -103,7 +103,7 @@ img {
   border-radius: 999px;
   background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
   color: #fff;
-  box-shadow: 0 12px 24px rgba(125, 63, 45, 0.24);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
 }
 
 .ghost-button {
@@ -167,8 +167,8 @@ img {
 
 .surface-input:focus,
 .surface-textarea:focus {
-  border-color: rgba(201, 109, 75, 0.52);
-  box-shadow: 0 0 0 4px rgba(201, 109, 75, 0.08);
+  border-color: rgba(17, 17, 17, 0.24);
+  box-shadow: 0 0 0 4px rgba(17, 17, 17, 0.06);
 }
 
 .empty-card {

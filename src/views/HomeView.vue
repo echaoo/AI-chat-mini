@@ -78,12 +78,11 @@ import { useRouter } from 'vue-router'
 import { getGreeting } from '@/constants/greetings'
 import { characterApi, conversationApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
-import type { CachedConversationCharacter, Character, ChatMode, PinnedCharacterSummary } from '@/types'
+import type { Character, ChatMode, PinnedCharacterSummary } from '@/types'
 import {
   clearHomeCharacterCache,
   getGreetingCache,
   getHomeCharacterCache,
-  getLastConversationCache,
   setGreetingCache,
   setHomeCharacterCache,
   type HomeCharacterCache
@@ -150,12 +149,13 @@ onMounted(async () => {
 })
 
 async function loadHomeCharacter() {
-  loading.value = true
   const cached = getHomeCharacterCache()
+  loading.value = !cached
 
   if (cached) {
     homeCharacter.value = cached
     updateAndDisplayGreeting()
+    loading.value = false
   }
 
   try {
@@ -167,17 +167,6 @@ async function loadHomeCharacter() {
       setHomeCharacterCache(mapped)
       updateAndDisplayGreeting()
       await fetchAndCacheNewGreeting()
-      return
-    }
-
-    const lastConversation = getLastConversationCache()
-    if (lastConversation?.character?.id) {
-      applyHomeCharacterFromCache(lastConversation)
-      try {
-        await characterApi.togglePinToHome(lastConversation.character.id)
-      } catch (error) {
-        // 首页兜底固定失败时保留本地体验即可。
-      }
       return
     }
 
@@ -208,19 +197,6 @@ function mapPinnedCharacter(serverData: PinnedCharacterSummary): HomeCharacterCa
     } as Character,
     timestamp: Date.now()
   }
-}
-
-function applyHomeCharacterFromCache(cached: CachedConversationCharacter) {
-  const mapped: HomeCharacterCache = {
-    characterId: cached.character.id,
-    conversationId: cached.conversationId,
-    character: cached.character,
-    timestamp: Date.now()
-  }
-
-  homeCharacter.value = mapped
-  setHomeCharacterCache(mapped)
-  updateAndDisplayGreeting()
 }
 
 function updateAndDisplayGreeting() {
@@ -266,10 +242,12 @@ function startChat(mode: ChatMode) {
     return
   }
 
+  const currentCharacter = homeCharacter.value.character
+
   router.push({
     name: 'chat',
     query: {
-      characterId: String(homeCharacter.value.character.id),
+      characterId: String(currentCharacter.id),
       conversationId: homeCharacter.value.conversationId ? String(homeCharacter.value.conversationId) : undefined,
       mode
     }

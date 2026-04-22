@@ -1,5 +1,5 @@
 import { STORAGE_KEYS } from '@/constants/storage'
-import type { CachedConversationCharacter, Character } from '@/types'
+import type { Character } from '@/types'
 import { getJson, removeStorage, setJson } from '@/utils/storage'
 
 export interface HomeCharacterCache {
@@ -25,14 +25,6 @@ export function setHomeCharacterCache(value: HomeCharacterCache) {
 
 export function clearHomeCharacterCache() {
   removeStorage(STORAGE_KEYS.homeCharacter)
-}
-
-export function getLastConversationCache() {
-  return getJson<CachedConversationCharacter>(STORAGE_KEYS.lastConversationCharacter)
-}
-
-export function setLastConversationCache(value: CachedConversationCharacter) {
-  setJson(STORAGE_KEYS.lastConversationCharacter, value)
 }
 
 export function getGreetingCache() {

@@ -11,20 +11,31 @@
           <span :class="{ 'message-bubble__aside': segment.isAside }">{{ segment.text }}</span>
         </template>
       </div>
-      <time v-if="!message.isLoading" class="message-bubble__time">{{ formatClock(message.createdAt) }}</time>
-    </div>
-    <div v-if="canRollback || canRegenerate" class="message-bubble__actions">
-      <button v-if="canRollback" class="ghost-button" type="button" @click="$emit('rollback')">回溯</button>
-      <button v-if="canRegenerate" class="ghost-button" type="button" @click="$emit('regenerate')">重新生成</button>
+      <div v-if="!message.isLoading" class="message-bubble__actions">
+        <button class="message-bubble__action" type="button" aria-label="复制" @click="handleCopy">
+          <img :src="resolvedCopyIcon" alt="" />
+        </button>
+        <button v-if="canRollback" class="message-bubble__action" type="button" aria-label="回溯" @click="$emit('rollback')">
+          <img :src="resolvedBackwardIcon" alt="" />
+        </button>
+        <button v-if="canRegenerate" class="message-bubble__action" type="button" aria-label="重新生成" @click="$emit('regenerate')">
+          <img :src="regenIcon" :class="{ 'message-bubble__action-icon--invert': isUserMessage }" alt="" />
+        </button>
+      </div>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import backwardIcon from '@/assets/chat/backward.png'
+import backwardWhiteIcon from '@/assets/chat/backward-white.png'
+import copyIcon from '@/assets/chat/copy.png'
+import copyWhiteIcon from '@/assets/chat/copy-white.png'
+import regenIcon from '@/assets/chat/regen.png'
+import { useUiStore } from '@/stores/ui'
 import type { Message } from '@/types'
 import { parseContentSegments } from '@/utils/chat'
-import { formatClock } from '@/utils/time'
 
 const props = defineProps<{
   message: Message
@@ -37,7 +48,16 @@ defineEmits<{
   (event: 'regenerate'): void
 }>()
 
+const uiStore = useUiStore()
+const isUserMessage = computed(() => props.message.role === 'user')
+const resolvedCopyIcon = computed(() => (isUserMessage.value ? copyWhiteIcon : copyIcon))
+const resolvedBackwardIcon = computed(() => (isUserMessage.value ? backwardWhiteIcon : backwardIcon))
 const segments = computed(() => parseContentSegments(props.message.content || ''))
+
+function handleCopy() {
+  void navigator.clipboard.writeText(props.message.content || '')
+  uiStore.notify('已复制', 'success')
+}
 </script>
 
 <style scoped lang="scss">
@@ -49,8 +69,8 @@ const segments = computed(() => parseContentSegments(props.message.content || ''
 
 .message-bubble__inner {
   max-width: min(100%, 540px);
-  padding: 18px 18px 14px;
-  border-radius: 24px;
+  padding: 18px 18px 12px;
+  border-radius: 12px;
   backdrop-filter: blur(16px);
 }
 
@@ -59,9 +79,10 @@ const segments = computed(() => parseContentSegments(props.message.content || ''
 }
 
 .message-bubble--assistant .message-bubble__inner {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   color: var(--text-primary);
-  box-shadow: 0 12px 24px rgba(16, 29, 48, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.06);
 }
 
 .message-bubble--user {
@@ -69,8 +90,9 @@ const segments = computed(() => parseContentSegments(props.message.content || ''
 }
 
 .message-bubble--user .message-bubble__inner {
-  background: rgba(17, 25, 37, 0.86);
-  color: rgba(255, 255, 255, 0.94);
+  background: linear-gradient(135deg, #2a2a2a 0%, #111111 100%);
+  color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
 }
 
 .message-bubble__content {
@@ -86,17 +108,6 @@ const segments = computed(() => parseContentSegments(props.message.content || ''
 
 .message-bubble--user .message-bubble__aside {
   color: rgba(255, 255, 255, 0.62);
-}
-
-.message-bubble__time {
-  display: block;
-  margin-top: 10px;
-  font-size: 12px;
-  color: rgba(93, 104, 120, 0.88);
-}
-
-.message-bubble--user .message-bubble__time {
-  color: rgba(255, 255, 255, 0.64);
 }
 
 .message-bubble__loading {
@@ -125,14 +136,28 @@ const segments = computed(() => parseContentSegments(props.message.content || ''
 
 .message-bubble__actions {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0;
 }
 
-.message-bubble__actions .ghost-button {
-  min-height: 34px;
-  padding: 0 14px;
-  font-size: 13px;
+.message-bubble__action {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+}
+
+.message-bubble__action img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.message-bubble__action-icon--invert {
+  filter: brightness(0) invert(1);
 }
 
 @keyframes loading-bounce {

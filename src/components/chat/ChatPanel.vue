@@ -71,12 +71,13 @@
           @keydown.enter.exact.prevent="handleSend"
         />
         <button
-          class="brand-button chat-panel__send"
+          class="chat-panel__send"
           type="button"
           :disabled="sending || !trimmedInput"
+          aria-label="发送"
           @click="handleSend"
         >
-          {{ sending ? '发送中' : '发送' }}
+          <img :src="sendIcon" alt="" />
         </button>
       </div>
     </template>
@@ -85,6 +86,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import sendIcon from '@/assets/chat/send.png'
 import ChatMessageBubble from '@/components/chat/ChatMessageBubble.vue'
 import { MESSAGE_CACHE_PREFIX, STORAGE_KEYS } from '@/constants/storage'
 import { conversationApi } from '@/services/api'
@@ -97,7 +99,7 @@ import type {
   Message,
   SendMessageResponse
 } from '@/types'
-import { getHomeCharacterCache, setHomeCharacterCache, setLastConversationCache } from '@/utils/cache'
+import { getHomeCharacterCache, setHomeCharacterCache } from '@/utils/cache'
 import { getJson, setJson, setString } from '@/utils/storage'
 
 type UIMessage = Message & { isLoading?: boolean }
@@ -487,11 +489,6 @@ function rememberConversation() {
   if (!conversationId.value || !props.character) return
 
   setString(STORAGE_KEYS.lastConversationId, String(conversationId.value))
-  setLastConversationCache({
-    conversationId: conversationId.value,
-    character: props.character,
-    timestamp: Date.now()
-  })
 
   const homeCache = getHomeCharacterCache()
   if (homeCache?.characterId === props.character.id) {
@@ -528,9 +525,9 @@ function triggerMemoryUpdate() {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 24px 60px rgba(15, 31, 54, 0.1);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .chat-panel__toolbar {
@@ -595,8 +592,8 @@ function triggerMemoryUpdate() {
   max-width: min(100%, 540px);
   border-radius: 24px;
   padding: 18px;
-  background: #fff;
-  box-shadow: 0 12px 24px rgba(16, 29, 48, 0.06);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.05);
   line-height: 1.7;
   white-space: pre-wrap;
   flex-shrink: 0;
@@ -605,7 +602,7 @@ function triggerMemoryUpdate() {
 .chat-panel__messages {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -614,6 +611,11 @@ function triggerMemoryUpdate() {
 
 .chat-panel__load-more {
   align-self: center;
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
 }
 
 .chat-panel__placeholder {
@@ -628,28 +630,53 @@ function triggerMemoryUpdate() {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: flex-end;
+  align-items: center;
   padding: 0 20px 20px;
   margin-top: auto;
   flex-shrink: 0;
-  border-top: 1px solid rgba(113, 128, 150, 0.12);
-  background: rgba(255, 255, 255, 0.94);
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.14));
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(24px) saturate(130%);
 }
 
 .chat-panel__textarea {
   width: 100%;
   min-height: 54px;
   max-height: 160px;
-  border: 1px solid rgba(113, 128, 150, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 18px;
   padding: 14px 16px;
   resize: none;
   outline: none;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+}
+
+.chat-panel__textarea::placeholder {
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .chat-panel__send {
-  min-width: 92px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.chat-panel__send img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.chat-panel__send:disabled {
+  opacity: 0.4;
 }
 
 @media (max-width: 720px) {
@@ -663,11 +690,12 @@ function triggerMemoryUpdate() {
   }
 
   .chat-panel__composer {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .chat-panel__send {
-    width: 100%;
+    width: 40px;
+    height: 40px;
   }
 }
 </style>

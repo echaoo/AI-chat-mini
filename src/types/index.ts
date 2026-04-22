@@ -150,11 +150,5 @@ export interface PinnedCharacterSummary {
   sleepBackgroundUrl?: string | null
 }
 
-export interface CachedConversationCharacter {
-  conversationId: number | null
-  character: Character
-  timestamp: number
-}
-
 export type ChatMode = 'normal' | 'romantic'
 export type BackgroundType = 'chat' | 'sleep' | 'companion'

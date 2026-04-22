@@ -4,7 +4,6 @@ export const STORAGE_KEYS = {
   userId: 'userId',
   lastConversationId: 'last_conversation_id',
   homeCharacter: 'home_character',
-  lastConversationCharacter: 'last_conversation_character',
   greetingCache: 'greeting_cache',
   favoriteCharacters: 'favorite_characters'
 } as const

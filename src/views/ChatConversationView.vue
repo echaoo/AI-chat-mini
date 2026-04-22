@@ -1,10 +1,16 @@
 <template>
-  <div class="chat-conversation">
+  <div class="chat-conversation" :style="backgroundStyle">
     <div class="chat-conversation__inner">
       <header class="chat-conversation__nav">
-        <button class="ghost-button" type="button" @click="goBack">返回</button>
-        <h1 class="chat-conversation__title">{{ currentCharacter?.name || '聊天' }}</h1>
-        <button class="ghost-button" type="button" @click="goHome">首页</button>
+        <button class="chat-conversation__back-button" type="button" aria-label="返回" @click="goBack">
+          <img :src="backIcon" alt="" />
+        </button>
+        <div class="chat-conversation__summary">
+          <h1 class="chat-conversation__title">{{ currentCharacter?.name || '聊天' }}</h1>
+        </div>
+        <button class="chat-conversation__icon-button" type="button" aria-label="设置" @click="openSettings">
+          <img :src="settingIcon" alt="" />
+        </button>
       </header>
 
       <section v-if="currentCharacter" class="chat-conversation__content">
@@ -35,12 +41,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import backIcon from '@/assets/chat/back.png'
+import settingIcon from '@/assets/chat/setting.png'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Character } from '@/types'
+import { getHomeCharacterCache } from '@/utils/cache'
+import { getCharacterCover } from '@/utils/character'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,6 +60,17 @@ const currentCharacter = ref<Character | null>(null)
 const panelConversationId = ref<number | null>(null)
 const loading = ref(true)
 const error = ref('')
+const backgroundStyle = computed(() => {
+  const cover = getCharacterCover(currentCharacter.value)
+
+  if (!cover) {
+    return {}
+  }
+
+  return {
+    backgroundImage: `linear-gradient(180deg, rgba(10, 10, 10, 0.22), rgba(10, 10, 10, 0.28)), url(${cover})`
+  }
+})
 
 onMounted(() => {
   void resolveChatTarget()
@@ -58,11 +79,12 @@ onMounted(() => {
 async function resolveChatTarget() {
   const characterId = Number(route.query.characterId)
   const conversationId = Number(route.query.conversationId)
+  const cachedHomeCharacter = getHomeCharacterCache()
 
   loading.value = true
   error.value = ''
 
-  currentCharacter.value = null
+  currentCharacter.value = cachedHomeCharacter?.character.id === characterId ? cachedHomeCharacter.character : null
   panelConversationId.value = conversationId || null
 
   try {
@@ -89,8 +111,8 @@ function goBack() {
   router.push({ name: 'characters' })
 }
 
-function goHome() {
-  router.push({ name: 'home' })
+function openSettings() {
+  uiStore.notify('设置入口预留中', 'info')
 }
 
 function handleConversationReady(payload: { conversationId: number; character: Character }) {
@@ -104,16 +126,17 @@ function handleConversationReady(payload: { conversationId: number; character: C
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 .chat-conversation__inner {
-  width: min(100%, 960px);
+  width: 100%;
   height: 100%;
-  margin: 0 auto;
-  padding: 16px;
+  padding: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
   overflow: hidden;
 }
 
@@ -123,22 +146,57 @@ function handleConversationReady(payload: { conversationId: number; character: C
   justify-content: space-between;
   gap: 12px;
   min-height: 64px;
-  padding: 10px 14px;
-  border-radius: 24px;
-  background: rgba(255, 252, 247, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 18px 48px rgba(15, 31, 54, 0.08);
-  backdrop-filter: blur(18px);
+  padding: calc(env(safe-area-inset-top) + 10px) 0 10px;
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.14));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(24px) saturate(130%);
   flex-shrink: 0;
+}
+
+.chat-conversation__back-button,
+.chat-conversation__icon-button {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.chat-conversation__back-button,
+.chat-conversation__icon-button {
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+}
+
+.chat-conversation__back-button img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+.chat-conversation__icon-button img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  opacity: 0.8;
+}
+
+.chat-conversation__summary {
+  flex: 1;
+  min-width: 0;
 }
 
 .chat-conversation__title {
   margin: 0;
-  flex: 1;
   text-align: center;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.24);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -147,6 +205,7 @@ function handleConversationReady(payload: { conversationId: number; character: C
 .chat-conversation__content {
   min-height: 0;
   overflow: hidden;
+  padding: 12px 16px 16px;
 }
 
 .chat-conversation__panel {
@@ -156,6 +215,7 @@ function handleConversationReady(payload: { conversationId: number; character: C
 
 .chat-conversation__state {
   min-height: 0;
+  margin: 12px 16px 16px;
   padding: 40px 28px;
   display: grid;
   place-items: center;
@@ -164,6 +224,19 @@ function handleConversationReady(payload: { conversationId: number; character: C
   background: rgba(255, 252, 247, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 18px 48px rgba(15, 31, 54, 0.08);
+}
+
+.chat-conversation__state-actions button {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--text-primary);
+}
+
+.chat-conversation__state-actions .ghost-button {
+  color: var(--text-secondary);
 }
 
 .chat-conversation__state h1 {
@@ -187,17 +260,21 @@ function handleConversationReady(payload: { conversationId: number; character: C
 }
 
 @media (max-width: 720px) {
-  .chat-conversation__inner {
-    padding: 12px;
-  }
-
   .chat-conversation__nav {
-    min-height: 56px;
-    padding: 8px 10px;
+    min-height: 60px;
+    padding: calc(env(safe-area-inset-top) + 8px) 0 8px;
   }
 
   .chat-conversation__title {
     font-size: 16px;
+  }
+
+  .chat-conversation__content {
+    padding: 8px 12px 12px;
+  }
+
+  .chat-conversation__state {
+    margin: 8px 12px 12px;
   }
 }
 </style>
