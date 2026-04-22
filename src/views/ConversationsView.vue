@@ -22,7 +22,7 @@
           :key="conversation.id"
           class="conversations-view__item glass-panel"
         >
-          <button class="conversations-view__content" type="button" @click="openConversation(conversation.id, conversation.character?.id || conversation.characterId)">
+          <button class="conversations-view__content" type="button" @click="openConversation(conversation)">
             <div class="conversations-view__avatar">
               <img v-if="conversation.character?.avatarUrl" :src="conversation.character.avatarUrl" :alt="conversation.character?.name" />
               <span v-else>{{ (conversation.character?.name || 'A').slice(0, 1) }}</span>
@@ -49,6 +49,7 @@ import ViewHeader from '@/components/common/ViewHeader.vue'
 import { conversationApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Conversation } from '@/types'
+import { setChatEntryCharacterCache } from '@/utils/cache'
 import { formatRelativeTime } from '@/utils/time'
 
 const router = useRouter()
@@ -72,12 +73,16 @@ async function loadConversations() {
   }
 }
 
-function openConversation(conversationId: number, characterId: number) {
+function openConversation(conversation: Conversation) {
+  if (conversation.character) {
+    setChatEntryCharacterCache(conversation.character)
+  }
+
   router.push({
     name: 'chat',
     query: {
-      characterId: String(characterId),
-      conversationId: String(conversationId)
+      characterId: String(conversation.characterId),
+      conversationId: String(conversation.id)
     }
   })
 }

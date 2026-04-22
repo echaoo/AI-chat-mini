@@ -169,6 +169,7 @@ import ViewHeader from '@/components/common/ViewHeader.vue'
 import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { BackgroundType, CharacterRules, CreateCharacterRequest } from '@/types'
+import { setChatEntryCharacterCache } from '@/utils/cache'
 
 const router = useRouter()
 const uiStore = useUiStore()
@@ -341,6 +342,7 @@ async function handleCreate() {
 
     const createdCharacter = await characterApi.createCharacter(payload)
     uiStore.notify('角色创建成功', 'success')
+    setChatEntryCharacterCache(createdCharacter)
 
     router.push({
       name: 'chat',

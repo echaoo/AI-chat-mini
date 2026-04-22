@@ -7,6 +7,7 @@
         </button>
         <div class="chat-conversation__summary">
           <h1 class="chat-conversation__title">{{ currentCharacter?.name || '聊天' }}</h1>
+          <p class="chat-conversation__meta">{{ currentModeLabel }} · {{ currentModelLabel }}</p>
         </div>
         <button class="chat-conversation__icon-button" type="button" aria-label="设置" @click="openSettings">
           <img :src="settingIcon" alt="" />
@@ -18,7 +19,7 @@
           class="chat-conversation__panel"
           :character="currentCharacter"
           :initial-conversation-id="panelConversationId"
-          chat-mode="normal"
+          :chat-mode="chatSettings.chatMode"
           :show-toolbar="false"
           @conversation-ready="handleConversationReady"
         />
@@ -41,25 +42,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import backIcon from '@/assets/chat/back.png'
 import settingIcon from '@/assets/chat/setting.png'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
-import { characterApi } from '@/services/api'
-import { useUiStore } from '@/stores/ui'
+import { getChatModeLabel, getChatModelLabel } from '@/constants/chat'
 import type { Character } from '@/types'
-import { getHomeCharacterCache } from '@/utils/cache'
+import { getChatEntryCharacterCache, getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 import { getCharacterCover } from '@/utils/character'
 
 const route = useRoute()
 const router = useRouter()
-const uiStore = useUiStore()
 
 const currentCharacter = ref<Character | null>(null)
 const panelConversationId = ref<number | null>(null)
+const chatSettings = ref(getChatSettingsCache())
 const loading = ref(true)
 const error = ref('')
+const currentModeLabel = computed(() => getChatModeLabel(chatSettings.value.chatMode))
+const currentModelLabel = computed(() => getChatModelLabel(chatSettings.value.modelId))
 const backgroundStyle = computed(() => {
   const cover = getCharacterCover(currentCharacter.value)
 
@@ -72,34 +74,31 @@ const backgroundStyle = computed(() => {
   }
 })
 
-onMounted(() => {
-  void resolveChatTarget()
-})
+watch(
+  () => route.fullPath,
+  () => {
+    chatSettings.value = getChatSettingsCache()
+    resolveChatTarget()
+  },
+  { immediate: true }
+)
 
-async function resolveChatTarget() {
-  const characterId = Number(route.query.characterId)
-  const conversationId = Number(route.query.conversationId)
-  const cachedHomeCharacter = getHomeCharacterCache()
+function resolveChatTarget() {
+  const characterId = parsePositiveQuery(route.query.characterId)
+  const conversationId = parsePositiveQuery(route.query.conversationId)
+  const cachedCharacter = getChatEntryCharacterCache()
 
   loading.value = true
   error.value = ''
-
-  currentCharacter.value = cachedHomeCharacter?.character.id === characterId ? cachedHomeCharacter.character : null
+  currentCharacter.value = cachedCharacter?.id === characterId ? cachedCharacter : null
   panelConversationId.value = conversationId || null
+  loading.value = false
+}
 
-  try {
-    if (characterId) {
-      const character = await characterApi.getCharacterDetail(characterId)
-
-      currentCharacter.value = character
-      panelConversationId.value = conversationId || null
-    }
-  } catch (loadError) {
-    error.value = (loadError as Error).message || '加载聊天失败'
-    uiStore.notify(error.value, 'error')
-  } finally {
-    loading.value = false
-  }
+function parsePositiveQuery(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
 }
 
 function goBack() {
@@ -112,12 +111,19 @@ function goBack() {
 }
 
 function openSettings() {
-  uiStore.notify('设置入口预留中', 'info')
+  router.push({
+    name: 'chat-settings',
+    query: {
+      characterId: currentCharacter.value?.id ? String(currentCharacter.value.id) : undefined,
+      conversationId: panelConversationId.value ? String(panelConversationId.value) : undefined
+    }
+  })
 }
 
 function handleConversationReady(payload: { conversationId: number; character: Character }) {
   currentCharacter.value = payload.character
   panelConversationId.value = payload.conversationId
+  setChatEntryCharacterCache(payload.character)
 }
 </script>
 
@@ -149,7 +155,6 @@ function handleConversationReady(payload: { conversationId: number; character: C
   padding: calc(env(safe-area-inset-top) + 10px) 0 10px;
   border-radius: 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.14));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.26);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(24px) saturate(130%);
   flex-shrink: 0;
@@ -202,10 +207,22 @@ function handleConversationReady(payload: { conversationId: number; character: C
   text-overflow: ellipsis;
 }
 
+.chat-conversation__meta {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.22);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .chat-conversation__content {
   min-height: 0;
   overflow: hidden;
-  padding: 12px 16px 16px;
+  padding: 0;
 }
 
 .chat-conversation__panel {
@@ -269,8 +286,12 @@ function handleConversationReady(payload: { conversationId: number; character: C
     font-size: 16px;
   }
 
+  .chat-conversation__meta {
+    font-size: 11px;
+  }
+
   .chat-conversation__content {
-    padding: 8px 12px 12px;
+    padding: 0;
   }
 
   .chat-conversation__state {

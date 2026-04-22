@@ -1,68 +1,73 @@
 <template>
-  <section class="chat-panel glass-panel">
-    <div v-if="hasToolbar" class="chat-panel__toolbar">
-      <div class="chat-panel__identity">
-        <div class="chat-panel__avatar">
-          <img v-if="character?.avatarUrl" :src="character.avatarUrl" :alt="character?.name || '聊天对象'" />
-          <span v-else>{{ avatarFallback }}</span>
+  <section class="chat-panel">
+    <div class="chat-panel__body">
+      <div v-if="hasToolbar" class="chat-panel__toolbar">
+        <div class="chat-panel__identity">
+          <div class="chat-panel__avatar">
+            <img v-if="character?.avatarUrl" :src="character.avatarUrl" :alt="character?.name || '聊天对象'" />
+            <span v-else>{{ avatarFallback }}</span>
+          </div>
+          <div class="chat-panel__identity-copy">
+            <h2 class="chat-panel__title">{{ character?.name || '聊天中' }}</h2>
+            <p class="chat-panel__subtitle">{{ toolbarSubtitle }}</p>
+          </div>
         </div>
-        <div class="chat-panel__identity-copy">
-          <h2 class="chat-panel__title">{{ character?.name || '聊天中' }}</h2>
-          <p class="chat-panel__subtitle">{{ toolbarSubtitle }}</p>
+        <div class="chat-panel__toolbar-actions">
+          <button
+            v-if="messages.length > previewLimit"
+            class="ghost-button"
+            type="button"
+            @click="toggleHistory"
+          >
+            {{ showHistory ? '收起历史' : '展开历史' }}
+          </button>
         </div>
       </div>
-      <div class="chat-panel__toolbar-actions">
-        <button
-          v-if="messages.length > previewLimit"
-          class="ghost-button"
-          type="button"
-          @click="toggleHistory"
+
+      <div v-if="loading && messages.length === 0" class="chat-panel__placeholder">
+        正在建立对话...
+      </div>
+
+      <template v-else>
+        <div
+          v-if="!hasStartedChat && greetingMessage"
+          class="chat-panel__welcome"
         >
-          {{ showHistory ? '收起历史' : '展开历史' }}
-        </button>
-      </div>
+          {{ greetingMessage }}
+        </div>
+
+        <div v-else ref="messageListRef" class="chat-panel__messages">
+          <button
+            v-if="shouldShowAllMessages && hasMoreHistory"
+            class="chip-button chat-panel__load-more"
+            type="button"
+            :disabled="isLoadingHistory"
+            @click="handleLoadMoreHistory"
+          >
+            {{ isLoadingHistory ? '加载中...' : '查看更早消息' }}
+          </button>
+
+          <div v-if="visibleMessages.length === 0" class="chat-panel__placeholder">
+            还没有消息，发一句开始吧。
+          </div>
+
+          <ChatMessageBubble
+            v-for="entry in visibleEntries"
+            :key="entry.message.id"
+            :message="entry.message"
+            :can-rollback="canRollback(entry.message, entry.index)"
+            :can-regenerate="canRegenerate(entry.message, entry.index)"
+            @rollback="handleRollbackMessage(entry.message, entry.index)"
+            @regenerate="handleRegenerateMessage(entry.message, entry.index)"
+          />
+        </div>
+      </template>
     </div>
 
-    <div v-if="loading && messages.length === 0" class="chat-panel__placeholder">
-      正在建立对话...
-    </div>
-
-    <template v-else>
-      <div
-        v-if="!hasStartedChat && greetingMessage"
-        class="chat-panel__welcome"
-      >
-        {{ greetingMessage }}
-      </div>
-
-      <div v-else ref="messageListRef" class="chat-panel__messages">
-        <button
-          v-if="shouldShowAllMessages && hasMoreHistory"
-          class="chip-button chat-panel__load-more"
-          type="button"
-          :disabled="isLoadingHistory"
-          @click="handleLoadMoreHistory"
-        >
-          {{ isLoadingHistory ? '加载中...' : '查看更早消息' }}
-        </button>
-
-        <div v-if="visibleMessages.length === 0" class="chat-panel__placeholder">
-          还没有消息，发一句开始吧。
-        </div>
-
-        <ChatMessageBubble
-          v-for="entry in visibleEntries"
-          :key="entry.message.id"
-          :message="entry.message"
-          :can-rollback="canRollback(entry.message, entry.index)"
-          :can-regenerate="canRegenerate(entry.message, entry.index)"
-          @rollback="handleRollbackMessage(entry.message, entry.index)"
-          @regenerate="handleRegenerateMessage(entry.message, entry.index)"
-        />
-      </div>
-
-      <div class="chat-panel__composer">
+    <div v-if="!(loading && messages.length === 0)" class="chat-panel__composer">
+      <div class="chat-panel__composer-field">
         <textarea
+          ref="textareaRef"
           v-model="inputText"
           class="chat-panel__textarea"
           placeholder="输入消息开始聊天..."
@@ -70,17 +75,35 @@
           rows="1"
           @keydown.enter.exact.prevent="handleSend"
         />
-        <button
-          class="chat-panel__send"
-          type="button"
-          :disabled="sending || !trimmedInput"
-          aria-label="发送"
-          @click="handleSend"
-        >
-          <img :src="sendIcon" alt="" />
-        </button>
+        <div class="chat-panel__composer-actions">
+          <button
+            class="chat-panel__quick-action chat-panel__quick-action--left"
+            type="button"
+            aria-label="输入左括号"
+            @click="handleQuickInsert('（')"
+          >
+            （
+          </button>
+          <button
+            class="chat-panel__quick-action chat-panel__quick-action--right"
+            type="button"
+            aria-label="输入右括号"
+            @click="handleQuickInsert('）')"
+          >
+            ）
+          </button>
+          <button
+            class="chat-panel__send"
+            type="button"
+            :disabled="sending || !trimmedInput"
+            aria-label="发送"
+            @click="handleSend"
+          >
+            <img :src="sendIcon" alt="" />
+          </button>
+        </div>
       </div>
-    </template>
+    </div>
   </section>
 </template>
 
@@ -120,6 +143,7 @@ const emit = defineEmits<{
 
 const uiStore = useUiStore()
 const messageListRef = ref<HTMLElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const conversationId = ref(0)
 const activeCharacterId = ref(0)
 const messages = ref<UIMessage[]>([])
@@ -174,6 +198,12 @@ watch(
   },
   { immediate: true }
 )
+
+watch(inputText, () => {
+  void nextTick(() => {
+    resizeTextarea()
+  })
+})
 
 onBeforeUnmount(() => {
   rememberConversation()
@@ -334,6 +364,35 @@ async function handleSend() {
   } finally {
     sending.value = false
   }
+}
+
+function handleQuickInsert(content: string) {
+  const textarea = textareaRef.value
+
+  if (!textarea) {
+    inputText.value += content
+    return
+  }
+
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  inputText.value = `${inputText.value.slice(0, start)}${content}${inputText.value.slice(end)}`
+
+  void nextTick(() => {
+    const cursor = start + content.length
+    textarea.focus()
+    textarea.setSelectionRange(cursor, cursor)
+  })
+}
+
+function resizeTextarea() {
+  const textarea = textareaRef.value
+  if (!textarea) return
+
+  textarea.style.height = '54px'
+  const nextHeight = Math.min(textarea.scrollHeight, 160)
+  textarea.style.height = `${Math.max(nextHeight, 54)}px`
+  textarea.style.overflowY = textarea.scrollHeight > 160 ? 'auto' : 'hidden'
 }
 
 function toggleHistory() {
@@ -520,14 +579,21 @@ function triggerMemoryUpdate() {
 
 <style scoped lang="scss">
 .chat-panel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
   overflow: hidden;
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+.chat-panel__body {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-panel__toolbar {
@@ -588,7 +654,7 @@ function triggerMemoryUpdate() {
 }
 
 .chat-panel__welcome {
-  margin: 18px 20px 0;
+  margin: 12px 6px 0;
   max-width: min(100%, 540px);
   border-radius: 24px;
   padding: 18px;
@@ -606,7 +672,7 @@ function triggerMemoryUpdate() {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 18px 20px 4px;
+  padding: 12px;
 }
 
 .chat-panel__load-more {
@@ -627,11 +693,7 @@ function triggerMemoryUpdate() {
 }
 
 .chat-panel__composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 0 20px 20px;
+  padding: 18px;
   margin-top: auto;
   flex-shrink: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.24);
@@ -640,13 +702,18 @@ function triggerMemoryUpdate() {
   backdrop-filter: blur(24px) saturate(130%);
 }
 
+.chat-panel__composer-field {
+  position: relative;
+  width: 100%;
+}
+
 .chat-panel__textarea {
   width: 100%;
   min-height: 54px;
   max-height: 160px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 18px;
-  padding: 14px 16px;
+  padding: 14px 102px 14px 16px;
   resize: none;
   outline: none;
   background: rgba(255, 255, 255, 0.18);
@@ -658,9 +725,47 @@ function triggerMemoryUpdate() {
   color: rgba(255, 255, 255, 0.68);
 }
 
+.chat-panel__composer-actions {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.chat-panel__quick-action {
+  width: 20px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.chat-panel__quick-action:focus,
+.chat-panel__quick-action:active,
+.chat-panel__quick-action:focus-visible {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
+.chat-panel__quick-action--left {
+  justify-content: flex-start;
+}
+
+.chat-panel__quick-action--right {
+  justify-content: flex-end;
+}
+
 .chat-panel__send {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -670,13 +775,13 @@ function triggerMemoryUpdate() {
 }
 
 .chat-panel__send img {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
 }
 
 .chat-panel__send:disabled {
-  opacity: 0.4;
+  opacity: 1;
 }
 
 @media (max-width: 720px) {
@@ -690,12 +795,12 @@ function triggerMemoryUpdate() {
   }
 
   .chat-panel__composer {
-    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 18px;
   }
 
   .chat-panel__send {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
   }
 }
 </style>

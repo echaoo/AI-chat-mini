@@ -20,6 +20,12 @@ const routes = [
     meta: { title: '聊天' }
   },
   {
+    path: '/chat/settings',
+    name: 'chat-settings',
+    component: () => import('@/views/ChatSettingsView.vue'),
+    meta: { title: '聊天设置' }
+  },
+  {
     path: '/conversations',
     name: 'conversations',
     component: () => import('@/views/ConversationsView.vue'),

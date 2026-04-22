@@ -68,8 +68,8 @@ function handleCopy() {
 }
 
 .message-bubble__inner {
-  max-width: min(100%, 540px);
-  padding: 18px 18px 12px;
+  max-width: min(90%, 540px);
+  padding: 8px 12px;
   border-radius: 12px;
   backdrop-filter: blur(16px);
 }

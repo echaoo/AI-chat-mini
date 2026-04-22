@@ -83,6 +83,7 @@ import {
   clearHomeCharacterCache,
   getGreetingCache,
   getHomeCharacterCache,
+  setChatEntryCharacterCache,
   setGreetingCache,
   setHomeCharacterCache,
   type HomeCharacterCache
@@ -243,6 +244,7 @@ function startChat(mode: ChatMode) {
   }
 
   const currentCharacter = homeCharacter.value.character
+  setChatEntryCharacterCache(currentCharacter)
 
   router.push({
     name: 'chat',
