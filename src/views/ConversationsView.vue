@@ -49,7 +49,7 @@ import ViewHeader from '@/components/common/ViewHeader.vue'
 import { conversationApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Conversation } from '@/types'
-import { setChatEntryCharacterCache } from '@/utils/cache'
+import { getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 import { formatRelativeTime } from '@/utils/time'
 
 const router = useRouter()
@@ -82,7 +82,8 @@ function openConversation(conversation: Conversation) {
     name: 'chat',
     query: {
       characterId: String(conversation.characterId),
-      conversationId: String(conversation.id)
+      conversationId: String(conversation.id),
+      mode: getChatSettingsCache().chatMode
     }
   })
 }
