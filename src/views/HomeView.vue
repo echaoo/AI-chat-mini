@@ -262,7 +262,10 @@ function openFeature(name: string) {
 }
 
 function handleInvite() {
-  uiStore.notify('邀请入口已预留，后续可接入分享或共创玩法', 'info')
+  router.push({
+    name: 'characters',
+    query: { from: 'home-invite' }
+  })
 }
 
 function goToChat() {
