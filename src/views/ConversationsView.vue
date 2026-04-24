@@ -89,7 +89,12 @@ function openConversation(conversation: Conversation) {
 }
 
 async function removeConversation(conversationId: number) {
-  const confirmed = window.confirm('删除后无法恢复，确定要删除这个对话吗？')
+  const confirmed = await uiStore.confirm({
+    title: '删除对话',
+    message: '删除后无法恢复，确定要删除这个对话吗？',
+    confirmText: '删除',
+    variant: 'danger'
+  })
   if (!confirmed) return
 
   try {

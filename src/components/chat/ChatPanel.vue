@@ -345,6 +345,10 @@ async function handleSend() {
     const nextMessages = [...messages.value]
     const loadingIndex = nextMessages.findIndex((item) => item.isLoading)
 
+    if (loadingIndex > 0 && response.userMessage && nextMessages[loadingIndex - 1]?.role === 'user') {
+      nextMessages[loadingIndex - 1] = response.userMessage
+    }
+
     if (loadingIndex >= 0) {
       nextMessages[loadingIndex] = response.assistantMessage
     } else {
@@ -435,7 +439,7 @@ async function handleLoadMoreHistory() {
 function canRegenerate(message: Message, index: number) {
   if (message.role !== 'assistant') return false
   if (index !== messages.value.length - 1) return false
-  return Boolean(getRegenerateContent(index))
+  return Boolean(getRegenerateSource(index)?.message.content)
 }
 
 function canRollback(message: Message, index: number) {
@@ -443,42 +447,68 @@ function canRollback(message: Message, index: number) {
   return message.role !== 'assistant'
 }
 
-function getRegenerateContent(index: number) {
+function getRegenerateSource(index: number) {
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
     const candidate = messages.value[cursor]
     if (candidate?.role === 'user') {
-      return candidate.content || ''
+      return {
+        message: candidate,
+        index: cursor
+      }
     }
   }
 
-  return ''
+  return null
 }
 
 async function handleRegenerateMessage(message: Message, index: number) {
   if (!conversationId.value || sending.value) return
 
-  const content = getRegenerateContent(index)
-  if (!content) {
+  const source = getRegenerateSource(index)
+  if (!source?.message.content) {
     uiStore.notify('未找到可重新生成的用户消息', 'error')
     return
   }
+  const content = source.message.content
 
-  const original = { ...messages.value[index] }
+  const originalAssistant = { ...messages.value[index] }
   const nextMessages = [...messages.value]
-  nextMessages[index] = { ...original, isLoading: true }
+  nextMessages[index] = { ...originalAssistant, isLoading: true }
   updateMessages(nextMessages)
   sending.value = true
+  let didRollback = false
 
   try {
+    await conversationApi.rollbackConversation(conversationId.value, source.message.id)
+    didRollback = true
+
     const response = await conversationApi.sendMessage(conversationId.value, content, props.chatMode)
+
+    if (!response.userMessage) {
+      const latestMessages = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
+      updateMessages(latestMessages.messages || [])
+      historyPage.value = 1
+      hasMoreHistory.value = (latestMessages.messages || []).length === HISTORY_PAGE_SIZE
+      await scrollToBottom()
+      return
+    }
+
     const refreshed = [...messages.value]
-    refreshed[index] = response.assistantMessage
+    refreshed.splice(source.index, index - source.index + 1, response.userMessage, response.assistantMessage)
     updateMessages(refreshed)
     await scrollToBottom()
   } catch (error) {
-    const rollbackMessages = [...messages.value]
-    rollbackMessages[index] = original
-    updateMessages(rollbackMessages)
+    if (didRollback) {
+      const rollbackMessages = [...messages.value]
+      rollbackMessages.splice(source.index, index - source.index + 1)
+      updateMessages(rollbackMessages)
+      inputText.value = content
+    } else {
+      const rollbackMessages = [...messages.value]
+      rollbackMessages[index] = originalAssistant
+      updateMessages(rollbackMessages)
+    }
+
     uiStore.notify((error as Error).message || '重新生成失败', 'error')
   } finally {
     sending.value = false
@@ -488,7 +518,15 @@ async function handleRegenerateMessage(message: Message, index: number) {
 async function handleRollbackMessage(message: Message, index: number) {
   if (!conversationId.value) return
 
-  const confirmed = window.confirm(message.role === 'assistant' ? '确认回溯到该回复？' : '确认从这条用户消息开始回溯？')
+  const confirmed = await uiStore.confirm({
+    title: '确认回溯',
+    message:
+      message.role === 'assistant'
+        ? '回溯后，该回复之后的消息会被移除。确认回到这条回复吗？'
+        : '回溯后，会从这条用户消息重新开始，并把内容放回输入框。确认继续吗？',
+    confirmText: '确认回溯',
+    variant: 'danger'
+  })
   if (!confirmed) return
 
   try {
@@ -616,7 +654,7 @@ function triggerMemoryUpdate() {
 .chat-panel__avatar {
   width: 44px;
   height: 44px;
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   background: linear-gradient(135deg, #efc8b6 0%, #d7e6fa 100%);
   display: grid;
@@ -656,7 +694,7 @@ function triggerMemoryUpdate() {
 .chat-panel__welcome {
   margin: 12px 6px 0;
   max-width: min(100%, 540px);
-  border-radius: 24px;
+  border-radius: 14px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.05);
@@ -697,7 +735,7 @@ function triggerMemoryUpdate() {
   margin-top: auto;
   flex-shrink: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.24);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.14));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.64));
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(24px) saturate(130%);
 }
@@ -712,7 +750,7 @@ function triggerMemoryUpdate() {
   min-height: 54px;
   max-height: 160px;
   border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 18px;
+  border-radius: 14px;
   padding: 14px 102px 14px 16px;
   resize: none;
   outline: none;

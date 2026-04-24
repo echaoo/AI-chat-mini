@@ -50,6 +50,9 @@
         </main>
 
         <nav class="home-dock glass-panel" aria-label="底部导航">
+          <button class="home-dock__item" type="button" @click="goToCharacters">
+            <span class="home-dock__label">发现</span>
+          </button>
           <button class="home-dock__item" type="button" @click="goToChat">
             <span class="home-dock__label">聊天</span>
           </button>
@@ -500,7 +503,7 @@ function goToMe() {
   right: 0;
   bottom: calc(env(safe-area-inset-bottom));
   display: grid;
-  grid-template-columns: repeat(3, minmax(88px, 1fr));
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
   gap: 10px;
   background: rgba(26, 18, 26, 0.46);
   border-color: rgba(255, 242, 236, 0.16);

@@ -23,34 +23,41 @@ const uiStore = useUiStore()
 .toast-stack {
   position: fixed;
   left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  z-index: 60;
+  top: 50%;
+  z-index: 80;
   display: grid;
   gap: 10px;
-  transform: translateX(-50%);
-  width: min(92vw, 420px);
+  justify-items: center;
+  transform: translate(-50%, -50%);
+  width: min(82vw, 360px);
+  pointer-events: none;
 }
 
 .toast-item {
-  border-radius: 999px;
-  padding: 12px 16px;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 16px;
+  padding: 14px 18px;
   text-align: center;
   color: #fff;
   font-size: 14px;
-  box-shadow: 0 12px 36px rgba(14, 31, 53, 0.18);
-  backdrop-filter: blur(12px);
+  line-height: 1.5;
+  background: rgba(8, 8, 8, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
 }
 
 .toast-item--info {
-  background: rgba(24, 38, 58, 0.86);
+  background: rgba(8, 8, 8, 0.9);
 }
 
 .toast-item--success {
-  background: rgba(28, 96, 69, 0.9);
+  background: rgba(8, 8, 8, 0.9);
 }
 
 .toast-item--error {
-  background: rgba(167, 47, 47, 0.92);
+  background: rgba(8, 8, 8, 0.9);
 }
 
 .toast-enter-active,
@@ -61,6 +68,6 @@ const uiStore = useUiStore()
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(10px) scale(0.98);
+  transform: translateY(6px) scale(0.96);
 }
 </style>

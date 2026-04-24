@@ -47,7 +47,6 @@
 
                 <div class="characters-view__chips">
                   <span class="characters-view__chip">{{ progressText(index) }}</span>
-                  <span class="characters-view__chip">{{ character.isOfficial ? '官方角色' : '自定义角色' }}</span>
                   <span v-if="character.isFavorite" class="characters-view__chip">已收藏</span>
                 </div>
               </div>
@@ -55,7 +54,16 @@
               <div class="characters-view__main">
                 <section class="characters-view__intro-panel">
                   <div class="characters-view__intro-title">介绍</div>
-                  <p>{{ getIntroText(character) }}</p>
+                  <p :ref="(el) => setStoryContentRef(character.id, el)">{{ getIntroText(character) }}</p>
+                  <button
+                    v-if="shouldShowIntroMore(character)"
+                    class="characters-view__story-more"
+                    type="button"
+                    aria-label="查看全部"
+                    @click="openStoryOverlay(character)"
+                  >
+                    <img class="characters-view__story-more-icon" :src="checkAllIcon" alt="" />
+                  </button>
                 </section>
 
                 <section class="characters-view__story-panel">
@@ -64,13 +72,43 @@
 
                 <footer class="characters-view__footer">
                   <div class="characters-view__identity">
-                    <h2>{{ character.name }}</h2>
-                    <p>{{ getMetaText(character) }}</p>
-                  </div>
+                    <div class="characters-view__identity-row">
+                      <h2>{{ character.name }}</h2>
 
-                  <button class="characters-view__invite-button" type="button" @click="openCharacter(character)">
-                    邀请聊天
-                  </button>
+                      <div class="characters-view__name-actions">
+                        <button
+                          class="characters-view__like-button"
+                          :class="{ 'characters-view__like-button--active': character.isFavorite }"
+                          type="button"
+                          aria-label="点赞"
+                          @click="handleToggleFavorite(character)"
+                        >
+                          <img
+                            class="characters-view__action-icon"
+                            :src="character.isFavorite ? likeIcon : likeWhiteIcon"
+                            alt=""
+                          />
+                        </button>
+                        <button
+                          class="characters-view__invite-button"
+                          :class="{ 'characters-view__invite-button--active': character.isPinnedToHome }"
+                          type="button"
+                          aria-label="邀请"
+                          @click="handleInviteCharacter(character)"
+                        >
+                          <img
+                            class="characters-view__action-icon"
+                            :src="character.isPinnedToHome ? inviteIcon : inviteWhiteIcon"
+                            alt=""
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <p v-if="getMetaText(character)">{{ getMetaText(character) }}</p>
+                    <button class="characters-view__chat-button" type="button" @click="openCharacter(character)">
+                      开始聊天
+                    </button>
+                  </div>
                 </footer>
               </div>
             </div>
@@ -78,6 +116,14 @@
         </div>
       </section>
     </main>
+
+    <div v-if="activeStoryCharacter" class="characters-view__story-overlay" @click="closeStoryOverlay">
+      <div class="characters-view__story-dialog">
+        <div class="characters-view__story-dialog-content">
+          {{ getIntroText(activeStoryCharacter) }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -85,10 +131,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import backIcon from '@/assets/chat/back.png'
+import checkAllIcon from '@/assets/roles/check-all.png'
+import inviteIcon from '@/assets/roles/invite.png'
+import inviteWhiteIcon from '@/assets/roles/invite-white.png'
+import likeIcon from '@/assets/roles/like.png'
+import likeWhiteIcon from '@/assets/roles/like-white.png'
 import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Character } from '@/types'
-import { getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
+import { getChatSettingsCache, setChatEntryCharacterCache, setHomeCharacterCache } from '@/utils/cache'
 
 const route = useRoute()
 const router = useRouter()
@@ -99,8 +150,11 @@ const favoriteCharacters = ref<Character[]>([])
 const officialCharacters = ref<Character[]>([])
 const standaloneCharacter = ref<Character | null>(null)
 const currentIndex = ref(0)
+const activeStoryCharacter = ref<Character | null>(null)
 const loading = ref(true)
 const error = ref('')
+const storyOverflowMap = ref<Record<number, boolean>>({})
+const storyContentRefs = new Map<number, HTMLElement>()
 
 const routeCharacterId = computed(() => parsePositiveQuery(route.query.characterId))
 const isInviteEntry = computed(() => {
@@ -159,6 +213,7 @@ async function loadCharacters() {
     currentIndex.value = resolveInitialIndex()
     await nextTick()
     scrollToIndex(currentIndex.value, false)
+    measureStoryOverflow()
   } catch (loadError) {
     error.value = (loadError as Error).message || '加载失败'
     uiStore.notify(error.value, 'error')
@@ -186,6 +241,7 @@ function parsePositiveQuery(value: unknown) {
 
 function handleResize() {
   scrollToIndex(currentIndex.value, false)
+  measureStoryOverflow()
 }
 
 function handleScroll() {
@@ -219,6 +275,63 @@ function goBack() {
 
 function progressText(index: number) {
   return `${index + 1}/${orderedCharacters.value.length}`
+}
+
+function setStoryContentRef(characterId: number, element: unknown) {
+  if (element instanceof HTMLElement) {
+    storyContentRefs.set(characterId, element)
+    return
+  }
+
+  storyContentRefs.delete(characterId)
+}
+
+function measureStoryOverflow() {
+  const nextState: Record<number, boolean> = {}
+
+  orderedCharacters.value.forEach((character) => {
+    const element = storyContentRefs.get(character.id)
+    nextState[character.id] = Boolean(element && isClampedContentOverflowing(element))
+  })
+
+  storyOverflowMap.value = nextState
+}
+
+function isStoryOverflow(characterId: number) {
+  return Boolean(storyOverflowMap.value[characterId])
+}
+
+function shouldShowIntroMore(character: Character) {
+  const contentLength = getIntroText(character).replace(/\s+/g, '').length
+  return isStoryOverflow(character.id) || contentLength > 24
+}
+
+function openStoryOverlay(character: Character) {
+  activeStoryCharacter.value = character
+}
+
+function closeStoryOverlay() {
+  activeStoryCharacter.value = null
+}
+
+function isClampedContentOverflowing(element: HTMLElement) {
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.style.position = 'fixed'
+  clone.style.visibility = 'hidden'
+  clone.style.pointerEvents = 'none'
+  clone.style.left = '-9999px'
+  clone.style.top = '0'
+  clone.style.width = `${element.clientWidth}px`
+  clone.style.height = 'auto'
+  clone.style.maxHeight = 'none'
+  clone.style.overflow = 'visible'
+  clone.style.display = 'block'
+  clone.style.webkitLineClamp = 'unset'
+  document.body.appendChild(clone)
+
+  const isOverflowing = clone.scrollHeight - element.clientHeight > 1
+  clone.remove()
+  return isOverflowing
 }
 
 function getCardCover(character: Character) {
@@ -262,11 +375,86 @@ function getMetaText(character: Character) {
   const parts = [
     character.organization,
     character.speciesType,
-    character.isPinnedToHome ? '首页角色' : '',
-    character.isOfficial ? '官方设定' : '自定义设定'
+    character.isPinnedToHome ? '首页角色' : ''
   ].filter(Boolean)
 
   return parts.join(' · ')
+}
+
+function patchCharacterState(characterId: number, patch: Partial<Character>, clearOthersPinned = false) {
+  favoriteCharacters.value = favoriteCharacters.value.map((item) => {
+    if (item.id !== characterId) {
+      return clearOthersPinned ? { ...item, isPinnedToHome: false } : item
+    }
+    return { ...item, ...patch }
+  })
+
+  officialCharacters.value = officialCharacters.value.map((item) => {
+    if (item.id !== characterId) {
+      return clearOthersPinned ? { ...item, isPinnedToHome: false } : item
+    }
+    return { ...item, ...patch }
+  })
+
+  if (standaloneCharacter.value?.id === characterId) {
+    standaloneCharacter.value = {
+      ...standaloneCharacter.value,
+      ...patch
+    }
+  } else if (clearOthersPinned && standaloneCharacter.value) {
+    standaloneCharacter.value = {
+      ...standaloneCharacter.value,
+      isPinnedToHome: false
+    }
+  }
+}
+
+async function handleToggleFavorite(character: Character) {
+  const previous = Boolean(character.isFavorite)
+  const nextValue = !previous
+
+  patchCharacterState(character.id, { isFavorite: nextValue })
+
+  try {
+    const result = await characterApi.toggleFavorite(character.id)
+    const confirmedValue = Boolean(result.isFavorite)
+    patchCharacterState(character.id, { isFavorite: confirmedValue })
+  } catch (toggleError) {
+    patchCharacterState(character.id, { isFavorite: previous })
+  }
+}
+
+async function handleInviteCharacter(character: Character) {
+  if (character.isPinnedToHome) {
+    uiStore.notify('已邀请', 'success')
+    return
+  }
+
+  try {
+    const result = await characterApi.togglePinToHome(character.id)
+    const isPinned = Boolean(result.isPinnedToHome)
+
+    if (!isPinned) {
+      uiStore.notify('取消邀请', 'error')
+      return
+    }
+
+    const nextCharacter = {
+      ...character,
+      isPinnedToHome: true
+    }
+
+    patchCharacterState(character.id, { isPinnedToHome: true }, true)
+    setHomeCharacterCache({
+      characterId: character.id,
+      conversationId: null,
+      character: nextCharacter,
+      timestamp: Date.now()
+    })
+    uiStore.notify('已邀请', 'success')
+  } catch (inviteError) {
+    uiStore.notify((inviteError as Error).message || '邀请失败', 'error')
+  }
 }
 
 function openCharacter(character: Character) {
@@ -448,9 +636,10 @@ function openCharacter(character: Character) {
 }
 
 .characters-view__intro-panel {
+  position: relative;
   padding: 18px 18px 16px;
-  border-radius: 24px;
-  background: rgba(5, 7, 11, 0.82);
+  border-radius: 14px;
+  background: rgba(5, 7, 11, 0.56);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(14px);
 }
@@ -471,25 +660,43 @@ function openCharacter(character: Character) {
 .characters-view__intro-panel p {
   display: -webkit-box;
   overflow: hidden;
+  padding-right: 28px;
   color: rgba(255, 255, 255, 0.94);
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 
 .characters-view__story-panel {
   padding: 22px 20px;
-  border-radius: 28px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
   color: #1d2230;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.16);
+  margin-bottom: 30px;
 }
 
 .characters-view__story-panel p {
-  display: -webkit-box;
-  overflow: hidden;
   font-size: clamp(17px, 3.8vw, 20px);
-  -webkit-line-clamp: 8;
-  -webkit-box-orient: vertical;
+  white-space: pre-wrap;
+}
+
+.characters-view__story-more {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+}
+
+.characters-view__story-more-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .characters-view__footer {
@@ -501,13 +708,40 @@ function openCharacter(character: Character) {
 
 .characters-view__identity {
   min-width: 0;
+  width: 100%;
+}
+
+.characters-view__identity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
 }
 
 .characters-view__identity h2 {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: clamp(34px, 7vw, 42px);
   line-height: 1.05;
   text-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.characters-view__name-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.characters-view__action-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .characters-view__identity p {
@@ -517,15 +751,75 @@ function openCharacter(character: Character) {
   line-height: 1.6;
 }
 
+.characters-view__like-button,
 .characters-view__invite-button {
-  min-height: 48px;
+  min-height: 36px;
+  width: 36px;
   flex-shrink: 0;
-  padding: 0 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+
+.characters-view__like-button {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.characters-view__like-button--active {
+  color: #fff;
+}
+
+.characters-view__invite-button {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.characters-view__invite-button--active {
+  color: #fff;
+}
+
+.characters-view__chat-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 44px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
   color: #12151d;
   font-weight: 700;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.characters-view__story-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.characters-view__story-dialog {
+  width: min(90vw, 720px);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 20px;
+  color: #fff;
+}
+
+.characters-view__story-dialog-title {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+
+.characters-view__story-dialog-content {
+  white-space: pre-wrap;
+  line-height: 1.9;
+  font-size: 16px;
 }
 
 .characters-view__state-shell {
@@ -582,16 +876,20 @@ function openCharacter(character: Character) {
   }
 
   .characters-view__story-panel p {
-    -webkit-line-clamp: 7;
+    font-size: clamp(17px, 4.2vw, 19px);
   }
 
   .characters-view__footer {
     align-items: stretch;
-    flex-direction: column;
   }
 
-  .characters-view__invite-button {
-    width: 100%;
+  .characters-view__identity-row {
+    align-items: center;
+  }
+
+  .characters-view__story-dialog {
+    width: 90vw;
+    max-width: none;
   }
 }
 </style>

@@ -221,7 +221,7 @@ function handleConversationReady(payload: { conversationId: number; character: C
   display: grid;
   place-items: center;
   text-align: center;
-  border-radius: 28px;
+  border-radius: 14px;
   background: rgba(255, 252, 247, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 18px 48px rgba(15, 31, 54, 0.08);
