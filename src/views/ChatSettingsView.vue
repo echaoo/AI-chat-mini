@@ -2,15 +2,7 @@
   <div class="chat-settings" :style="backgroundStyle">
     <div class="chat-settings__veil" />
     <div class="chat-settings__inner">
-      <header class="chat-settings__nav">
-        <button class="chat-settings__back-button" type="button" aria-label="返回" @click="goBack">
-          <img :src="backIcon" alt="" />
-        </button>
-        <div class="chat-settings__summary">
-          <h1 class="chat-settings__title">设置</h1>
-        </div>
-        <div class="chat-settings__spacer" aria-hidden="true" />
-      </header>
+      <OverlayHeader title="设置" @back="goBack" />
 
       <main class="chat-settings__content">
         <section class="chat-settings__panel glass-panel">
@@ -69,7 +61,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import backIcon from '@/assets/chat/back.png'
+import OverlayHeader from '@/components/common/OverlayHeader.vue'
 import { CHAT_MODE_OPTIONS, CHAT_MODEL_OPTIONS } from '@/constants/chat'
 import type { ChatMode, ChatModelId } from '@/types'
 import { getChatEntryCharacterCache, getChatSettingsCache, setChatSettingsCache } from '@/utils/cache'
@@ -190,60 +182,6 @@ function goBack() {
   overflow: hidden;
 }
 
-.chat-settings__nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 64px;
-  padding: calc(env(safe-area-inset-top) + 10px) 0 10px;
-  border-radius: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.14));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(24px) saturate(130%);
-  flex-shrink: 0;
-}
-
-.chat-settings__back-button,
-.chat-settings__spacer {
-  width: 52px;
-  height: 52px;
-  flex-shrink: 0;
-}
-
-.chat-settings__back-button {
-  padding: 0;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  box-shadow: none;
-}
-
-.chat-settings__back-button img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  opacity: 0.92;
-}
-
-.chat-settings__summary {
-  flex: 1;
-  min-width: 0;
-}
-
-.chat-settings__title {
-  margin: 0;
-  text-align: center;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.96);
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.24);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .chat-settings__content {
   min-height: 0;
   overflow-y: auto;
@@ -332,15 +270,6 @@ function goBack() {
 }
 
 @media (max-width: 720px) {
-  .chat-settings__nav {
-    min-height: 60px;
-    padding: calc(env(safe-area-inset-top) + 8px) 0 8px;
-  }
-
-  .chat-settings__title {
-    font-size: 16px;
-  }
-
   .chat-settings__content {
     padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
   }

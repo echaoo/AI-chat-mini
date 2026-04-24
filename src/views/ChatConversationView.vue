@@ -1,17 +1,13 @@
 <template>
   <div class="chat-conversation" :style="backgroundStyle">
     <div class="chat-conversation__inner">
-      <header class="chat-conversation__nav">
-        <button class="chat-conversation__back-button" type="button" aria-label="返回" @click="goBack">
-          <img :src="backIcon" alt="" />
-        </button>
-        <div class="chat-conversation__summary">
-          <h1 class="chat-conversation__title">{{ currentCharacter?.name || '聊天' }}</h1>
-        </div>
-        <button class="chat-conversation__icon-button" type="button" aria-label="设置" @click="openSettings">
-          <img :src="settingIcon" alt="" />
-        </button>
-      </header>
+      <OverlayHeader :title="currentCharacter?.name || '聊天'" @back="goBack">
+        <template #right>
+          <button class="chat-conversation__icon-button" type="button" aria-label="设置" @click="openSettings">
+            <img :src="settingIcon" alt="" />
+          </button>
+        </template>
+      </OverlayHeader>
 
       <section v-if="currentCharacter" class="chat-conversation__content">
         <ChatPanel
@@ -43,7 +39,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import backIcon from '@/assets/chat/back.png'
+import OverlayHeader from '@/components/common/OverlayHeader.vue'
 import settingIcon from '@/assets/chat/setting.png'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import type { Character } from '@/types'
@@ -142,40 +138,14 @@ function handleConversationReady(payload: { conversationId: number; character: C
   overflow: hidden;
 }
 
-.chat-conversation__nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 64px;
-  padding: calc(env(safe-area-inset-top) + 10px) 0 10px;
-  border-radius: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.14));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(24px) saturate(130%);
-  flex-shrink: 0;
-}
-
-.chat-conversation__back-button,
 .chat-conversation__icon-button {
-  width: 52px;
-  height: 52px;
-  flex-shrink: 0;
-}
-
-.chat-conversation__back-button,
-.chat-conversation__icon-button {
+  width: 100%;
+  height: 100%;
   padding: 0;
   display: grid;
   place-items: center;
   background: transparent;
-}
-
-.chat-conversation__back-button img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  opacity: 0.92;
+  box-shadow: none;
 }
 
 .chat-conversation__icon-button img {
@@ -183,24 +153,6 @@ function handleConversationReady(payload: { conversationId: number; character: C
   height: 22px;
   object-fit: contain;
   opacity: 0.8;
-}
-
-.chat-conversation__summary {
-  flex: 1;
-  min-width: 0;
-}
-
-.chat-conversation__title {
-  margin: 0;
-  text-align: center;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: rgba(255, 255, 255, 0.96);
-  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.24);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .chat-conversation__content {
@@ -261,15 +213,6 @@ function handleConversationReady(payload: { conversationId: number; character: C
 }
 
 @media (max-width: 720px) {
-  .chat-conversation__nav {
-    min-height: 60px;
-    padding: calc(env(safe-area-inset-top) + 8px) 0 8px;
-  }
-
-  .chat-conversation__title {
-    font-size: 16px;
-  }
-
   .chat-conversation__content {
     padding: 0;
   }

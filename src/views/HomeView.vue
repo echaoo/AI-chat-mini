@@ -53,7 +53,7 @@
           <button class="home-dock__item" type="button" @click="goToCharacters">
             <span class="home-dock__label">发现</span>
           </button>
-          <button class="home-dock__item" type="button" @click="goToChat">
+          <button class="home-dock__item" type="button" @click="goToChatCharacters">
             <span class="home-dock__label">聊天</span>
           </button>
           <button class="home-dock__item home-dock__item--active" type="button">
@@ -271,8 +271,8 @@ function handleInvite() {
   })
 }
 
-function goToChat() {
-  startChat()
+function goToChatCharacters() {
+  router.push({ name: 'chat-characters' })
 }
 
 function goToCharacters() {

@@ -32,6 +32,12 @@ const routes = [
     meta: { title: '对话历史' }
   },
   {
+    path: '/chat-characters',
+    name: 'chat-characters',
+    component: () => import('@/views/ChattedCharactersView.vue'),
+    meta: { title: '聊过的角色' }
+  },
+  {
     path: '/create-character',
     name: 'create-character',
     component: () => import('@/views/CreateCharacterView.vue'),
