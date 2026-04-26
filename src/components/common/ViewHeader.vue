@@ -34,7 +34,7 @@ defineProps<{
 
 .view-header__eyebrow {
   margin: 0 0 10px;
-  color: var(--brand-deep);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;

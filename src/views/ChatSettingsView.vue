@@ -165,8 +165,8 @@ function goBack() {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 248, 244, 0.14), rgba(255, 244, 239, 0.08)),
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.18), transparent 42%);
+    linear-gradient(180deg, rgba(16, 11, 17, 0.16), rgba(16, 11, 17, 0.08)),
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 42%);
   backdrop-filter: blur(28px) saturate(125%);
   pointer-events: none;
 }
@@ -185,22 +185,22 @@ function goBack() {
 .chat-settings__content {
   min-height: 0;
   overflow-y: auto;
-  background: rgba(255, 248, 244, 0.08);
+  background: transparent;
   padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
 }
 
 .chat-settings__panel {
   padding: 24px 16px;
-  background: rgba(255, 248, 244, 0.18);
-  border-color: rgba(255, 244, 238, 0.22);
-  color: rgba(255, 249, 246, 0.96);
-  box-shadow: 0 18px 40px rgba(14, 10, 16, 0.12);
+  background: rgba(26, 18, 26, 0.56);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
 }
 
 .chat-settings__group + .chat-settings__group {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid rgba(255, 244, 238, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .chat-settings__field-head {
@@ -214,13 +214,13 @@ function goBack() {
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 247, 243, 0.84);
+  color: var(--text-primary);
 }
 
 .chat-settings__field-value {
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 247, 243, 0.7);
+  color: var(--text-secondary);
 }
 
 .chat-settings__options {
@@ -237,31 +237,31 @@ function goBack() {
   gap: 14px;
   align-items: center;
   text-align: left;
-  border-radius: 22px;
-  background: rgba(255, 248, 244, 0.12);
-  border: 1px solid rgba(255, 244, 238, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: inherit;
   box-shadow: none;
 }
 
 .chat-settings__option--active {
-  background: rgba(255, 247, 243, 0.16);
-  border-color: rgba(255, 239, 232, 0.42);
-  box-shadow: 0 14px 30px rgba(12, 8, 16, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
 }
 
 .chat-settings__option-mark {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 244, 238, 0.48);
-  background: rgba(255, 247, 242, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.04);
   box-shadow: inset 0 0 0 4px transparent;
 }
 
 .chat-settings__option--active .chat-settings__option-mark {
-  background: #fff7f2;
-  box-shadow: inset 0 0 0 4px rgba(240, 125, 126, 0.92);
+  background: #ffffff;
+  box-shadow: inset 0 0 0 4px rgba(86, 58, 87, 0.96);
 }
 
 .chat-settings__option-label {

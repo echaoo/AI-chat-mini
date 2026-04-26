@@ -27,9 +27,34 @@ function normalizeCharacter(character: Character | null | undefined) {
 }
 
 function normalizeConversation(conversation: Conversation) {
+  const fallbackCharacter =
+    conversation.characterId > 0
+      ? ({
+          id: conversation.characterId,
+          name: conversation.characterName || `角色 #${conversation.characterId}`,
+          avatarUrl: conversation.characterAvatar || null,
+          description: conversation.lastMessagePreview || null,
+          greetingMessage: null,
+          chatBackgroundUrl: null,
+          sleepBackgroundUrl: null,
+          companionBackgroundUrl: null
+        } as Character)
+      : null
+
+  const character = normalizeCharacter(conversation.character) || normalizeCharacter(fallbackCharacter)
+
   return {
     ...conversation,
-    character: normalizeCharacter(conversation.character) || undefined
+    title: conversation.title || null,
+    messageCount: typeof conversation.messageCount === 'number' ? conversation.messageCount : 0,
+    lastMessageAt: conversation.lastMessageAt || null,
+    lastMessagePreview: conversation.lastMessagePreview || null,
+    favorabilityScore: typeof conversation.favorabilityScore === 'number' ? conversation.favorabilityScore : null,
+    intimacyStage: conversation.intimacyStage || null,
+    relationshipPhase: conversation.relationshipPhase || null,
+    characterName: conversation.characterName || character?.name || null,
+    characterAvatar: conversation.characterAvatar || character?.avatarUrl || null,
+    character: character || undefined
   }
 }
 
@@ -83,8 +108,8 @@ export const characterApi = {
 
 export const conversationApi = {
   async getConversations() {
-    const result = await get<Conversation[]>('/companion/conversations')
-    return (result || []).map(normalizeConversation)
+    const result = await get<{ list: Conversation[] }>('/companion/conversations')
+    return (result?.list || []).map(normalizeConversation)
   },
   createConversation(characterId: number) {
     return post<CreateConversationResponse>('/companion/conversations', { characterId })

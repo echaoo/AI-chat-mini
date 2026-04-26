@@ -1,9 +1,16 @@
 <template>
   <div class="characters-view">
     <header class="characters-view__nav">
-      <button class="characters-view__back-button" type="button" aria-label="返回" @click="goBack">
+      <button
+        v-if="showBackButton"
+        class="characters-view__back-button"
+        type="button"
+        aria-label="返回"
+        @click="goBack"
+      >
         <img :src="backIcon" alt="" />
       </button>
+      <div v-else class="characters-view__nav-spacer" aria-hidden="true" />
 
       <div class="characters-view__summary">
         <h1 class="characters-view__title">{{ currentCharacter?.name || pageTitle }}</h1>
@@ -124,6 +131,8 @@
         </div>
       </div>
     </div>
+
+    <BottomMenu />
   </div>
 </template>
 
@@ -136,6 +145,7 @@ import inviteIcon from '@/assets/roles/invite.png'
 import inviteWhiteIcon from '@/assets/roles/invite-white.png'
 import likeIcon from '@/assets/roles/like.png'
 import likeWhiteIcon from '@/assets/roles/like-white.png'
+import BottomMenu from '@/components/common/BottomMenu.vue'
 import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
 import type { Character } from '@/types'
@@ -145,6 +155,7 @@ const route = useRoute()
 const router = useRouter()
 const uiStore = useUiStore()
 
+const showBackButton = false
 const scrollContainer = ref<HTMLElement | null>(null)
 const favoriteCharacters = ref<Character[]>([])
 const officialCharacters = ref<Character[]>([])
@@ -557,7 +568,7 @@ function openCharacter(character: Character) {
 .characters-view__slide-inner {
   min-height: 100vh;
   min-height: 100dvh;
-  padding: calc(env(safe-area-inset-top)) 0 calc(env(safe-area-inset-bottom) + 24px);
+  padding: calc(env(safe-area-inset-top)) 0 calc(env(safe-area-inset-bottom) + 104px);
   display: grid;
   place-items: stretch center;
 }
@@ -565,7 +576,7 @@ function openCharacter(character: Character) {
 .characters-view__card {
   position: relative;
   width: min(100%, 560px);
-  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 104px);
   min-height: 620px;
   overflow: hidden;
   background-color: #11151d;
@@ -825,7 +836,7 @@ function openCharacter(character: Character) {
 .characters-view__state-shell {
   min-height: 100vh;
   min-height: 100dvh;
-  padding: calc(env(safe-area-inset-top) + 108px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  padding: calc(env(safe-area-inset-top) + 108px) 16px calc(env(safe-area-inset-bottom) + 104px);
   display: grid;
   place-items: center;
 }

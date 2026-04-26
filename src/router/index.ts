@@ -38,6 +38,12 @@ const routes = [
     meta: { title: '聊过的角色' }
   },
   {
+    path: '/invite',
+    name: 'invite',
+    component: () => import('@/views/InviteView.vue'),
+    meta: { title: '邀请' }
+  },
+  {
     path: '/create-character',
     name: 'create-character',
     component: () => import('@/views/CreateCharacterView.vue'),

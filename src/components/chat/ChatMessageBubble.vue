@@ -80,7 +80,7 @@ function handleCopy() {
 
 .message-bubble--assistant .message-bubble__inner {
   background: rgba(255, 255, 255, 0.96);
-  color: var(--text-primary);
+  color: #161016;
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.06);
 }

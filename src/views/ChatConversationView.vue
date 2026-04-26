@@ -42,6 +42,7 @@ import { useRoute, useRouter } from 'vue-router'
 import OverlayHeader from '@/components/common/OverlayHeader.vue'
 import settingIcon from '@/assets/chat/setting.png'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import { characterApi } from '@/services/api'
 import type { Character } from '@/types'
 import { getChatEntryCharacterCache, getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 import { getCharacterCover } from '@/utils/character'
@@ -54,6 +55,7 @@ const panelConversationId = ref<number | null>(null)
 const chatSettings = ref(getChatSettingsCache())
 const loading = ref(true)
 const error = ref('')
+const resolveSeed = ref(0)
 const backgroundStyle = computed(() => {
   const cover = getCharacterCover(currentCharacter.value)
 
@@ -70,21 +72,52 @@ watch(
   () => route.fullPath,
   () => {
     chatSettings.value = getChatSettingsCache()
-    resolveChatTarget()
+    void resolveChatTarget()
   },
   { immediate: true }
 )
 
-function resolveChatTarget() {
+async function resolveChatTarget() {
+  const currentSeed = ++resolveSeed.value
   const characterId = parsePositiveQuery(route.query.characterId)
   const conversationId = parsePositiveQuery(route.query.conversationId)
   const cachedCharacter = getChatEntryCharacterCache()
 
   loading.value = true
   error.value = ''
-  currentCharacter.value = cachedCharacter?.id === characterId ? cachedCharacter : null
   panelConversationId.value = conversationId || null
-  loading.value = false
+
+  if (!characterId) {
+    currentCharacter.value = null
+    error.value = '缺少角色信息'
+    loading.value = false
+    return
+  }
+
+  if (cachedCharacter?.id === characterId) {
+    currentCharacter.value = cachedCharacter
+    loading.value = false
+    return
+  }
+
+  currentCharacter.value = null
+
+  try {
+    const character = await characterApi.getCharacterDetail(characterId)
+
+    if (currentSeed !== resolveSeed.value) return
+
+    currentCharacter.value = character
+    setChatEntryCharacterCache(character)
+  } catch (loadError) {
+    if (currentSeed !== resolveSeed.value) return
+
+    error.value = (loadError as Error).message || '加载聊天对象失败'
+  } finally {
+    if (currentSeed === resolveSeed.value) {
+      loading.value = false
+    }
+  }
 }
 
 function parsePositiveQuery(value: unknown) {
@@ -153,6 +186,7 @@ function handleConversationReady(payload: { conversationId: number; character: C
   height: 22px;
   object-fit: contain;
   opacity: 0.8;
+  filter: brightness(0) invert(1);
 }
 
 .chat-conversation__content {
@@ -174,9 +208,10 @@ function handleConversationReady(payload: { conversationId: number; character: C
   place-items: center;
   text-align: center;
   border-radius: 14px;
-  background: rgba(255, 252, 247, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 18px 48px rgba(15, 31, 54, 0.08);
+  background: rgba(26, 18, 26, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
 }
 
 .chat-conversation__state-actions button {

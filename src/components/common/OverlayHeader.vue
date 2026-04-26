@@ -1,8 +1,15 @@
 <template>
   <header class="overlay-header">
-    <button class="overlay-header__back-button" type="button" :aria-label="backAriaLabel" @click="emit('back')">
+    <button
+      v-if="props.showBack"
+      class="overlay-header__back-button"
+      type="button"
+      :aria-label="props.backAriaLabel"
+      @click="emit('back')"
+    >
       <img :src="backIcon" alt="" />
     </button>
+    <div v-else class="overlay-header__spacer" aria-hidden="true" />
 
     <div class="overlay-header__summary">
       <h1 class="overlay-header__title">{{ title }}</h1>
@@ -19,13 +26,15 @@
 <script setup lang="ts">
 import backIcon from '@/assets/chat/back.png'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string
     backAriaLabel?: string
+    showBack?: boolean
   }>(),
   {
-    backAriaLabel: '返回'
+    backAriaLabel: '返回',
+    showBack: true
   }
 )
 
@@ -43,8 +52,9 @@ const emit = defineEmits<{
   min-height: 64px;
   padding: calc(env(safe-area-inset-top) + 10px) 0 10px;
   border-radius: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.14));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(180deg, rgba(26, 18, 26, 0.78), rgba(26, 18, 26, 0.46));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(24px) saturate(130%);
   flex-shrink: 0;
 }
@@ -71,6 +81,7 @@ const emit = defineEmits<{
   height: 26px;
   object-fit: contain;
   opacity: 0.92;
+  filter: brightness(0) invert(1);
 }
 
 .overlay-header__summary {

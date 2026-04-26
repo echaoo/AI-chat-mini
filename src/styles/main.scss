@@ -1,20 +1,21 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: 'PingFang SC', 'Noto Sans SC', 'Helvetica Neue', sans-serif;
-  --bg-page: #f3f3f1;
-  --bg-panel: rgba(255, 255, 255, 0.8);
-  --bg-panel-strong: rgba(255, 255, 255, 0.94);
-  --bg-dark: rgba(18, 18, 18, 0.82);
-  --text-primary: #111111;
-  --text-secondary: #6c6c6c;
+  --bg-page: #0f0a12;
+  --bg-panel: rgba(26, 18, 26, 0.46);
+  --bg-panel-strong: rgba(26, 18, 26, 0.72);
+  --bg-dark: rgba(12, 8, 12, 0.88);
+  --text-primary: rgba(255, 255, 255, 0.96);
+  --text-secondary: rgba(255, 255, 255, 0.62);
   --text-light: rgba(255, 255, 255, 0.94);
-  --line-soft: rgba(17, 17, 17, 0.1);
-  --brand: #111111;
-  --brand-deep: #000000;
-  --brand-soft: #ececec;
-  --danger: #a63f3f;
-  --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.08);
-  --shadow-card: 0 14px 36px rgba(0, 0, 0, 0.12);
+  --line-soft: rgba(255, 255, 255, 0.1);
+  --brand: #2d1f2d;
+  --brand-deep: #120c13;
+  --brand-soft: rgba(255, 255, 255, 0.06);
+  --danger: #ff8c8c;
+  --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.28);
+  --shadow-card: 0 14px 36px rgba(0, 0, 0, 0.24);
+  --radius-md: 14px;
 }
 
 * {
@@ -30,9 +31,9 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(221, 221, 221, 0.6), transparent 30%),
-    linear-gradient(180deg, #f7f7f5 0%, #efefec 100%);
+    radial-gradient(circle at top, rgba(104, 69, 104, 0.18), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(74, 44, 74, 0.22), transparent 32%),
+    linear-gradient(180deg, #09070c 0%, #120d14 45%, #1a121a 100%);
   color: var(--text-primary);
 }
 
@@ -69,8 +70,8 @@ img {
 
 .glass-panel {
   background: var(--bg-panel);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(18px);
 }
@@ -90,27 +91,27 @@ img {
 
 .chip-button {
   min-height: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   padding: 0 18px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
-  border: 1px solid rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .brand-button {
   min-height: 48px;
   padding: 0 20px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(92, 72, 93, 0.92) 0%, rgba(35, 24, 35, 0.96) 100%);
   color: #fff;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
 }
 
 .ghost-button {
   min-height: 44px;
   padding: 0 18px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
   border: 1px solid var(--line-soft);
 }
@@ -118,8 +119,8 @@ img {
 .danger-button {
   min-height: 40px;
   padding: 0 16px;
-  border-radius: 999px;
-  background: rgba(180, 69, 69, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(180, 69, 69, 0.18);
   color: var(--danger);
 }
 
@@ -146,9 +147,9 @@ img {
 .surface-input,
 .surface-textarea {
   width: 100%;
-  border: 1px solid rgba(113, 128, 150, 0.18);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -167,8 +168,8 @@ img {
 
 .surface-input:focus,
 .surface-textarea:focus {
-  border-color: rgba(17, 17, 17, 0.24);
-  box-shadow: 0 0 0 4px rgba(17, 17, 17, 0.06);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
 }
 
 .empty-card {

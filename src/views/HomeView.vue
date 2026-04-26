@@ -266,7 +266,7 @@ function openFeature(name: string) {
 
 function handleInvite() {
   router.push({
-    name: 'characters',
+    name: 'invite',
     query: { from: 'home-invite' }
   })
 }

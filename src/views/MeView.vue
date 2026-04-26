@@ -1,63 +1,47 @@
 <template>
-  <div class="page-shell">
+  <div class="page-shell me-view-page">
     <div class="page-inner me-view">
-      <ViewHeader
-        eyebrow="账户中心"
-        title="我的"
-        description="这里查看账号信息，也保留聊天相关设定入口。"
-      >
-        <template #actions>
-          <RouterLink class="ghost-button" to="/">首页</RouterLink>
-        </template>
-      </ViewHeader>
+      <OverlayHeader title="我的" :show-back="false" @back="goBack" />
 
-      <section class="me-profile glass-panel">
-        <p class="me-profile__eyebrow">个人信息</p>
-        <h2 class="me-profile__name">{{ displayName }}</h2>
-
-        <div class="me-profile__stats">
-          <article class="me-stat">
-            <span class="me-stat__label">积分余额</span>
-            <strong class="me-stat__value">{{ pointsBalance }}</strong>
-          </article>
-          <article class="me-stat">
-            <span class="me-stat__label">当前模型</span>
-            <strong class="me-stat__value">{{ currentModelLabel }}</strong>
-          </article>
+      <section class="me-list glass-panel" aria-label="账户信息">
+        <div class="me-list__item">
+          <span class="me-list__label">名字</span>
+          <strong class="me-list__value">{{ displayName }}</strong>
+        </div>
+        <div class="me-list__item">
+          <span class="me-list__label">积分余额</span>
+          <strong class="me-list__value">{{ pointsBalance }}</strong>
+        </div>
+        <div class="me-list__item">
+          <span class="me-list__label">当前模型</span>
+          <strong class="me-list__value">{{ currentModelLabel }}</strong>
         </div>
       </section>
 
-      <section class="me-menu glass-panel" aria-label="功能入口">
-        <button class="me-menu__item" type="button" @click="openMyPreferences">
-          <div class="me-menu__copy">
-            <p class="me-menu__title">我的设定</p>
-            <p class="me-menu__description">入口先保留，功能暂未开放。</p>
-          </div>
-          <span class="me-menu__value me-menu__value--muted">未开放</span>
+      <section class="me-list glass-panel" aria-label="功能入口">
+        <button class="me-list__item me-list__item--action" type="button" @click="openMyPreferences">
+          <span class="me-list__label">我的设定</span>
+          <span class="me-list__value me-list__value--muted">未开放</span>
         </button>
-
-        <button class="me-menu__item" type="button" @click="openModelSelection">
-          <div class="me-menu__copy">
-            <p class="me-menu__title">模型选择</p>
-            <p class="me-menu__description">沿用聊天页的模型选择设置。</p>
-          </div>
-          <span class="me-menu__value">{{ currentModelLabel }}</span>
+        <button class="me-list__item me-list__item--action" type="button" @click="openModelSelection">
+          <span class="me-list__label">模型选择</span>
+          <span class="me-list__action-meta">
+            <span class="me-list__value">{{ currentModelLabel }}</span>
+            <img class="me-list__arrow" :src="arrowRightIcon" alt="" />
+          </span>
         </button>
-      </section>
-
-      <section class="me-shortcuts">
-        <button class="ghost-button" type="button" @click="router.push({ name: 'chat-characters' })">聊过角色</button>
-        <button class="ghost-button" type="button" @click="router.push({ name: 'conversations' })">对话历史</button>
-        <button class="ghost-button" type="button" @click="router.push({ name: 'create-character' })">创建角色</button>
       </section>
     </div>
+    <BottomMenu />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import ViewHeader from '@/components/common/ViewHeader.vue'
+import { useRouter } from 'vue-router'
+import arrowRightIcon from '@/assets/common/arrow-right.png'
+import BottomMenu from '@/components/common/BottomMenu.vue'
+import OverlayHeader from '@/components/common/OverlayHeader.vue'
 import { getChatModelLabel } from '@/constants/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
@@ -78,142 +62,91 @@ function openMyPreferences() {
 function openModelSelection() {
   router.push({ name: 'chat-settings' })
 }
+
+function goBack() {
+  if (window.history.state?.back) {
+    router.back()
+    return
+  }
+
+  router.push({ name: 'home' })
+}
 </script>
 
 <style scoped lang="scss">
+.me-view-page {
+  padding: 0 0 calc(104px + env(safe-area-inset-bottom));
+}
+
 .me-view {
   display: grid;
-  gap: 24px;
-}
-
-.me-profile,
-.me-menu {
-  padding: 24px;
-}
-
-.me-profile__eyebrow {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--brand-deep);
-}
-
-.me-profile__name {
-  margin: 16px 0 0;
-  font-size: clamp(32px, 5vw, 40px);
-  line-height: 1.1;
-}
-
-.me-profile__stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  margin-top: 24px;
-}
-
-.me-stat {
-  padding: 20px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-}
-
-.me-stat__label {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.me-stat__value {
-  display: block;
-  margin-top: 12px;
-  font-size: 24px;
-  line-height: 1.2;
-}
-
-.me-menu {
-  display: grid;
-  padding-block: 8px;
-}
-
-.me-menu__item {
   width: 100%;
+}
+
+.me-list {
+  width: min(calc(100% - 32px), 720px);
+  justify-self: center;
+  overflow: hidden;
+}
+
+.me-list__item {
+  width: 100%;
+  min-height: 56px;
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px;
-  border-radius: 20px;
   background: transparent;
   color: inherit;
   text-align: left;
   box-shadow: none;
 }
 
-.me-menu__item + .me-menu__item {
-  border-top: 1px solid var(--line-soft);
+.me-list__item + .me-list__item {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.me-menu__copy {
-  min-width: 0;
+.me-list__item--action {
+  cursor: pointer;
 }
 
-.me-menu__title,
-.me-menu__description {
-  margin: 0;
-}
-
-.me-menu__title {
+.me-list__label,
+.me-list__value {
   font-size: 16px;
-  font-weight: 600;
   line-height: 1.5;
 }
 
-.me-menu__description {
-  margin-top: 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.6;
+.me-list__label {
+  min-width: 0;
 }
 
-.me-menu__value {
+.me-list__value {
   flex-shrink: 0;
-  padding: 0 14px;
-  min-height: 36px;
+  color: var(--text-secondary);
+}
+
+.me-list__action-meta {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  font-size: 13px;
-  line-height: 1;
+  gap: 8px;
 }
 
-.me-menu__value--muted {
-  color: var(--text-secondary);
+.me-list__arrow {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  opacity: 0.72;
 }
 
-.me-shortcuts {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+.me-list__item strong {
+  color: var(--text-primary);
 }
 
 @media (max-width: 720px) {
-  .me-profile__stats {
-    grid-template-columns: 1fr;
-  }
-
-  .me-menu__item {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .me-shortcuts {
-    display: grid;
+  .me-list__item {
+    min-height: 52px;
   }
 }
 </style>

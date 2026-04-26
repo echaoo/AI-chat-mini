@@ -50,13 +50,19 @@ export interface Character {
 
 export interface Conversation {
   id: number
-  userId: number
+  userId?: number
   characterId: number
+  characterName?: string | null
+  characterAvatar?: string | null
   title: string | null
   messageCount: number
   lastMessageAt: string | null
-  createdAt: string
-  updatedAt: string
+  lastMessagePreview?: string | null
+  favorabilityScore?: number | null
+  intimacyStage?: string | null
+  relationshipPhase?: string | null
+  createdAt?: string
+  updatedAt?: string
   character?: Character
 }
 
