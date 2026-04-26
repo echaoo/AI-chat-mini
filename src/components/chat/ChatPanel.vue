@@ -113,6 +113,7 @@ import sendIcon from '@/assets/chat/send.png'
 import ChatMessageBubble from '@/components/chat/ChatMessageBubble.vue'
 import { MESSAGE_CACHE_PREFIX, STORAGE_KEYS } from '@/constants/storage'
 import { conversationApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type {
   Character,
@@ -142,6 +143,7 @@ const emit = defineEmits<{
 }>()
 
 const uiStore = useUiStore()
+const authStore = useAuthStore()
 const messageListRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const conversationId = ref(0)
@@ -355,6 +357,7 @@ async function handleSend() {
       nextMessages.push(response.assistantMessage)
     }
 
+    syncPointsBalance(response)
     updateMessages(nextMessages)
     rememberConversation()
     await scrollToBottom()
@@ -493,6 +496,7 @@ async function handleRegenerateMessage(message: Message, index: number) {
       return
     }
 
+    syncPointsBalance(response)
     const refreshed = [...messages.value]
     refreshed.splice(source.index, index - source.index + 1, response.userMessage, response.assistantMessage)
     updateMessages(refreshed)
@@ -604,6 +608,12 @@ function rememberConversation() {
     conversationId: conversationId.value,
     character: props.character
   })
+}
+
+function syncPointsBalance(response: Pick<SendMessageResponse, 'pointsBalance'>) {
+  if (typeof response.pointsBalance !== 'number') return
+
+  authStore.syncPoints(response.pointsBalance)
 }
 
 function triggerMemoryUpdate() {

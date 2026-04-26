@@ -34,8 +34,7 @@ export const useAuthStore = defineStore('auth', {
 
       try {
         const remoteUser = await authApi.getMe()
-        this.userInfo = remoteUser
-        setJson(STORAGE_KEYS.userInfo, remoteUser)
+        this.setUserInfo(remoteUser)
       } catch (error) {
         // H5 首版先允许测试 token 直通，拉不到用户信息时保留本地 mock。
       } finally {
@@ -46,6 +45,25 @@ export const useAuthStore = defineStore('auth', {
       this.token = token
       this.isLoggedIn = Boolean(token)
       setString(STORAGE_KEYS.token, token)
+    },
+    setUserInfo(userInfo: UserInfo) {
+      this.userInfo = userInfo
+      setJson(STORAGE_KEYS.userInfo, userInfo)
+    },
+    syncPoints(points: number) {
+      if (!Number.isFinite(points)) return
+
+      const nextUserInfo = this.userInfo
+        ? {
+            ...this.userInfo,
+            points
+          }
+        : {
+            ...MOCK_USER,
+            points
+          }
+
+      this.setUserInfo(nextUserInfo)
     }
   }
 })
