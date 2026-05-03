@@ -4,7 +4,7 @@
       <ViewHeader
         eyebrow="角色编辑"
         title="创建自定义角色"
-        description="先延续你现在的小程序字段结构，H5 这边直接复用后端接口。"
+        description="创建角色核心档案，后续场景身份可以独立叠加。"
       >
         <template #actions>
           <RouterLink class="ghost-button" to="/">首页</RouterLink>
@@ -29,18 +29,51 @@
           </label>
 
           <label class="create-view__field create-view__field--wide">
-            <span class="field-label">角色设定（JSON）*</span>
+            <span class="field-label">角色核心概括 *</span>
             <textarea
-              v-model="form.systemPrompt"
+              v-model="form.coreSummary"
               class="surface-textarea"
-              placeholder='{
-  "core_summary": "你是一位温柔的AI伴侣...",
-  "dialogue_examples": ["你好呀", "别担心，我一直在"]
-}'
+              placeholder="写清楚这个角色稳定不变的人格底色、表达方式和关系定位。"
             />
-            <span class="field-help" :class="{ 'field-help--error': Boolean(jsonError) }">
-              {{ jsonError || '至少包含 core_summary 和 dialogue_examples 字段。' }}
+            <span class="field-help" :class="{ 'field-help--error': Boolean(profileError) }">
+              {{ profileError || '这部分会作为所有主对话和后续场景的角色核心。' }}
             </span>
+          </label>
+
+          <label class="create-view__field">
+            <span class="field-label">性格关键词</span>
+            <textarea
+              v-model="form.personalityTraits"
+              class="surface-textarea"
+              placeholder="每行一个，例如：克制、敏锐、慢热"
+            />
+          </label>
+
+          <label class="create-view__field">
+            <span class="field-label">对话风格示例 *</span>
+            <textarea
+              v-model="form.dialogueExamples"
+              class="surface-textarea"
+              placeholder="每行一句角色会说的话"
+            />
+          </label>
+
+          <label class="create-view__field create-view__field--wide">
+            <span class="field-label">角色原设经历</span>
+            <textarea
+              v-model="form.backgroundStory"
+              class="surface-textarea"
+              placeholder="只写角色本体经历，不写某个临时场景里的身份。"
+            />
+          </label>
+
+          <label class="create-view__field create-view__field--wide">
+            <span class="field-label">补充设定</span>
+            <textarea
+              v-model="form.otherInfo"
+              class="surface-textarea"
+              placeholder="口头禅、偏好、边界、特殊习惯等。"
+            />
           </label>
 
           <label class="create-view__field">
@@ -70,7 +103,7 @@
 
           <label class="create-view__field">
             <span class="field-label">物种类型</span>
-            <input v-model="form.speciesType" class="surface-input" placeholder="human / spirit / goblin" />
+            <input v-model="form.speciesType" class="surface-input" placeholder="human / spirit / custom" />
           </label>
 
           <label class="create-view__field">
@@ -168,7 +201,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import ViewHeader from '@/components/common/ViewHeader.vue'
 import { characterApi } from '@/services/api'
 import { useUiStore } from '@/stores/ui'
-import type { BackgroundType, CharacterRules, CreateCharacterRequest } from '@/types'
+import type { BackgroundType, CharacterProfile, CharacterRules, CreateCharacterRequest } from '@/types'
 import { getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 
 const router = useRouter()
@@ -177,7 +210,11 @@ const uiStore = useUiStore()
 const form = reactive({
   name: '',
   description: '',
-  systemPrompt: '',
+  coreSummary: '',
+  personalityTraits: '',
+  backgroundStory: '',
+  dialogueExamples: '',
+  otherInfo: '',
   greetingMessage: '',
   avatarUrl: '',
   abilityLevel: '',
@@ -200,10 +237,13 @@ const sleepInputRef = ref<HTMLInputElement | null>(null)
 const companionInputRef = ref<HTMLInputElement | null>(null)
 const submitting = ref(false)
 
-const jsonError = computed(() => validateProfileJson(form.systemPrompt))
+const hasRequiredProfile = computed(() => {
+  return Boolean(form.coreSummary.trim()) && parseLines(form.dialogueExamples).length > 0
+})
+const profileError = computed(() => validateProfileForm())
 const characterRulesError = computed(() => validateCharacterRules(form.characterRules))
 const canSubmit = computed(() => {
-  return Boolean(form.name.trim()) && Boolean(form.systemPrompt.trim()) && !jsonError.value && !characterRulesError.value
+  return Boolean(form.name.trim()) && hasRequiredProfile.value && !profileError.value && !characterRulesError.value
 })
 
 const backgroundItems = computed(() => [
@@ -212,28 +252,40 @@ const backgroundItems = computed(() => [
   { type: 'companion' as const, label: '陪伴背景', url: form.companionBackgroundUrl }
 ])
 
-function validateProfileJson(jsonStr: string) {
-  if (!jsonStr.trim()) return ''
+function parseLines(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
 
-  try {
-    const parsed = JSON.parse(jsonStr)
+function validateProfileForm() {
+  if (!form.coreSummary.trim() && !form.dialogueExamples.trim()) return ''
+  if (!form.coreSummary.trim()) return '请填写角色核心概括'
+  if (parseLines(form.dialogueExamples).length === 0) return '请至少填写一条对话风格示例'
+  return ''
+}
 
-    if (!parsed.core_summary || typeof parsed.core_summary !== 'string') {
-      return '缺少必填字段：core_summary'
-    }
-
-    if (!Array.isArray(parsed.dialogue_examples) || parsed.dialogue_examples.length === 0) {
-      return '缺少必填字段：dialogue_examples'
-    }
-
-    if (parsed.core_summary.length > 200) {
-      return 'core_summary 不能超过 200 字'
-    }
-
-    return ''
-  } catch (error) {
-    return 'JSON 格式错误，请检查后再提交'
+function buildProfileJson(): CharacterProfile {
+  const profile: CharacterProfile = {
+    core_summary: form.coreSummary.trim(),
+    dialogue_examples: parseLines(form.dialogueExamples)
   }
+
+  const personalityTraits = parseLines(form.personalityTraits)
+  if (personalityTraits.length > 0) {
+    Object.assign(profile, { personality_traits: personalityTraits })
+  }
+
+  if (form.backgroundStory.trim()) {
+    Object.assign(profile, { background_story: form.backgroundStory.trim() })
+  }
+
+  if (form.otherInfo.trim()) {
+    Object.assign(profile, { other_info: form.otherInfo.trim() })
+  }
+
+  return profile
 }
 
 function validateCharacterRules(jsonStr: string) {
@@ -328,7 +380,7 @@ async function handleCreate() {
     const payload: CreateCharacterRequest = {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
-      systemPrompt: form.systemPrompt.trim(),
+      profileJson: buildProfileJson(),
       greetingMessage: form.greetingMessage.trim() || undefined,
       avatarUrl: form.avatarUrl.trim() || undefined,
       abilityLevel: abilityLevelValue ? Number(abilityLevelValue) : undefined,
