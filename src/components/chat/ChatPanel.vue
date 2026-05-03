@@ -113,7 +113,6 @@ import sendIcon from '@/assets/chat/send.png'
 import ChatMessageBubble from '@/components/chat/ChatMessageBubble.vue'
 import { MESSAGE_CACHE_PREFIX, STORAGE_KEYS } from '@/constants/storage'
 import { conversationApi } from '@/services/api'
-import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type {
   Character,
@@ -126,7 +125,8 @@ import type {
 import { getHomeCharacterCache, setHomeCharacterCache } from '@/utils/cache'
 import { getJson, setJson, setString } from '@/utils/storage'
 
-type UIMessage = Message & { isLoading?: boolean }
+type UIMessage = Message & { isLoading?: boolean; isLocal?: boolean }
+type RelationshipResponse = Pick<SendMessageResponse, 'relationshipState'>
 
 const HISTORY_PAGE_SIZE = 10
 const MEMORY_UPDATE_MESSAGE_INTERVAL = 20
@@ -143,7 +143,6 @@ const emit = defineEmits<{
 }>()
 
 const uiStore = useUiStore()
-const authStore = useAuthStore()
 const messageListRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const conversationId = ref(0)
@@ -302,6 +301,17 @@ async function loadExistingConversation(currentInit: number) {
   }
 }
 
+async function refreshConversationMessages() {
+  if (!conversationId.value) return []
+
+  const response = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
+  const latestMessages = response.messages || []
+  updateMessages(latestMessages)
+  historyPage.value = 1
+  hasMoreHistory.value = latestMessages.length === HISTORY_PAGE_SIZE
+  return latestMessages
+}
+
 async function handleSend() {
   const content = trimmedInput.value
 
@@ -314,12 +324,13 @@ async function handleSend() {
   if (!conversationId.value) return
 
   const optimisticUser: UIMessage = {
-    id: Date.now(),
+    id: -Date.now(),
     conversationId: conversationId.value,
     role: 'user',
     content,
     tokens: null,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    isLocal: true
   }
 
   const optimisticAssistant: UIMessage = {
@@ -347,17 +358,13 @@ async function handleSend() {
     const nextMessages = [...messages.value]
     const loadingIndex = nextMessages.findIndex((item) => item.isLoading)
 
-    if (loadingIndex > 0 && response.userMessage && nextMessages[loadingIndex - 1]?.role === 'user') {
-      nextMessages[loadingIndex - 1] = response.userMessage
-    }
-
     if (loadingIndex >= 0) {
       nextMessages[loadingIndex] = response.assistantMessage
     } else {
       nextMessages.push(response.assistantMessage)
     }
 
-    syncPointsBalance(response)
+    syncRelationshipState(response)
     updateMessages(nextMessages)
     rememberConversation()
     await scrollToBottom()
@@ -439,13 +446,13 @@ async function handleLoadMoreHistory() {
   }
 }
 
-function canRegenerate(message: Message, index: number) {
+function canRegenerate(message: UIMessage, index: number) {
   if (message.role !== 'assistant') return false
   if (index !== messages.value.length - 1) return false
   return Boolean(getRegenerateSource(index)?.message.content)
 }
 
-function canRollback(message: Message, index: number) {
+function canRollback(message: UIMessage, index: number) {
   if (index !== messages.value.length - 1) return true
   return message.role !== 'assistant'
 }
@@ -464,19 +471,62 @@ function getRegenerateSource(index: number) {
   return null
 }
 
-async function handleRegenerateMessage(message: Message, index: number) {
+async function resolveServerMessage(message: UIMessage, index: number) {
+  if (!message.isLocal) return { message, index }
+
+  const nextMessage = messages.value[index + 1]
+  const latestMessages = await refreshConversationMessages()
+
+  if (nextMessage) {
+    const nextIndex = latestMessages.findIndex((item) => item.id === nextMessage.id)
+    if (nextIndex > 0) {
+      return {
+        message: latestMessages[nextIndex - 1],
+        index: nextIndex - 1
+      }
+    }
+  }
+
+  const matchedIndex = latestMessages.findIndex((item) => item.role === message.role && item.content === message.content)
+  if (matchedIndex < 0) return null
+
+  return {
+    message: latestMessages[matchedIndex],
+    index: matchedIndex
+  }
+}
+
+async function handleRegenerateMessage(message: UIMessage, index: number) {
   if (!conversationId.value || sending.value) return
 
-  const source = getRegenerateSource(index)
+  let targetIndex = index
+  let source = getRegenerateSource(targetIndex)
   if (!source?.message.content) {
     uiStore.notify('未找到可重新生成的用户消息', 'error')
     return
   }
+
+  if (source.message.isLocal) {
+    try {
+      const latestMessages = await refreshConversationMessages()
+      targetIndex = latestMessages.findIndex((item) => item.id === message.id)
+      source = targetIndex >= 0 ? getRegenerateSource(targetIndex) : null
+    } catch (error) {
+      uiStore.notify((error as Error).message || '同步消息失败', 'error')
+      return
+    }
+
+    if (!source?.message.content) {
+      uiStore.notify('消息同步中，请稍后再试', 'error')
+      return
+    }
+  }
+
   const content = source.message.content
 
-  const originalAssistant = { ...messages.value[index] }
+  const originalAssistant = { ...messages.value[targetIndex] }
   const nextMessages = [...messages.value]
-  nextMessages[index] = { ...originalAssistant, isLoading: true }
+  nextMessages[targetIndex] = { ...originalAssistant, isLoading: true }
   updateMessages(nextMessages)
   sending.value = true
   let didRollback = false
@@ -487,29 +537,18 @@ async function handleRegenerateMessage(message: Message, index: number) {
 
     const response = await conversationApi.sendMessage(conversationId.value, content, props.chatMode)
 
-    if (!response.userMessage) {
-      const latestMessages = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
-      updateMessages(latestMessages.messages || [])
-      historyPage.value = 1
-      hasMoreHistory.value = (latestMessages.messages || []).length === HISTORY_PAGE_SIZE
-      await scrollToBottom()
-      return
-    }
-
-    syncPointsBalance(response)
-    const refreshed = [...messages.value]
-    refreshed.splice(source.index, index - source.index + 1, response.userMessage, response.assistantMessage)
-    updateMessages(refreshed)
+    syncRelationshipState(response)
+    await refreshConversationMessages()
     await scrollToBottom()
   } catch (error) {
     if (didRollback) {
       const rollbackMessages = [...messages.value]
-      rollbackMessages.splice(source.index, index - source.index + 1)
+      rollbackMessages.splice(source.index, targetIndex - source.index + 1)
       updateMessages(rollbackMessages)
       inputText.value = content
     } else {
       const rollbackMessages = [...messages.value]
-      rollbackMessages[index] = originalAssistant
+      rollbackMessages[targetIndex] = originalAssistant
       updateMessages(rollbackMessages)
     }
 
@@ -519,7 +558,7 @@ async function handleRegenerateMessage(message: Message, index: number) {
   }
 }
 
-async function handleRollbackMessage(message: Message, index: number) {
+async function handleRollbackMessage(message: UIMessage, index: number) {
   if (!conversationId.value) return
 
   const confirmed = await uiStore.confirm({
@@ -534,16 +573,25 @@ async function handleRollbackMessage(message: Message, index: number) {
   if (!confirmed) return
 
   try {
-    if (message.role === 'assistant') {
-      if (!canRollback(message, index)) {
+    const resolved = await resolveServerMessage(message, index)
+    if (!resolved) {
+      uiStore.notify('消息同步中，请稍后再试', 'error')
+      return
+    }
+
+    const targetMessage = resolved.message
+    const targetIndex = resolved.index
+
+    if (targetMessage.role === 'assistant') {
+      if (!canRollback(targetMessage, targetIndex)) {
         uiStore.notify('无法回溯最新回复', 'error')
         return
       }
-      const nextMessage = messages.value[index + 1]
-      const rollbackMessageId = nextMessage ? nextMessage.id : message.id
+      const nextMessage = messages.value[targetIndex + 1]
+      const rollbackMessageId = nextMessage ? nextMessage.id : targetMessage.id
       await conversationApi.rollbackConversation(conversationId.value, rollbackMessageId)
       const response = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
-      const messageIndex = (response.messages || []).findIndex((item) => item.id === message.id)
+      const messageIndex = (response.messages || []).findIndex((item) => item.id === targetMessage.id)
       updateMessages(messageIndex >= 0 ? response.messages.slice(0, messageIndex + 1) : response.messages || [])
       historyPage.value = 1
       hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
@@ -551,12 +599,9 @@ async function handleRollbackMessage(message: Message, index: number) {
       return
     }
 
-    await conversationApi.rollbackConversation(conversationId.value, message.id)
-    const response = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
-    updateMessages(response.messages || [])
-    historyPage.value = 1
-    hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
-    inputText.value = message.content || ''
+    await conversationApi.rollbackConversation(conversationId.value, targetMessage.id)
+    await refreshConversationMessages()
+    inputText.value = targetMessage.content || ''
     await scrollToBottom(false)
   } catch (error) {
     uiStore.notify((error as Error).message || '回溯失败', 'error')
@@ -610,10 +655,19 @@ function rememberConversation() {
   })
 }
 
-function syncPointsBalance(response: Pick<SendMessageResponse, 'pointsBalance'>) {
-  if (typeof response.pointsBalance !== 'number') return
+function syncRelationshipState(response: RelationshipResponse) {
+  const relationshipState = response.relationshipState || null
 
-  authStore.syncPoints(response.pointsBalance)
+  if (!relationshipState || !props.character) return
+
+  const homeCache = getHomeCharacterCache()
+  if (homeCache?.characterId !== props.character.id) return
+
+  setHomeCharacterCache({
+    ...homeCache,
+    relationshipState,
+    timestamp: Date.now()
+  })
 }
 
 function triggerMemoryUpdate() {

@@ -50,8 +50,10 @@ function normalizeConversation(conversation: Conversation) {
     lastMessageAt: conversation.lastMessageAt || null,
     lastMessagePreview: conversation.lastMessagePreview || null,
     favorabilityScore: typeof conversation.favorabilityScore === 'number' ? conversation.favorabilityScore : null,
+    trustScore: typeof conversation.trustScore === 'number' ? conversation.trustScore : null,
     intimacyStage: conversation.intimacyStage || null,
     relationshipPhase: conversation.relationshipPhase || null,
+    relationshipState: conversation.relationshipState || null,
     characterName: conversation.characterName || character?.name || null,
     characterAvatar: conversation.characterAvatar || character?.avatarUrl || null,
     character: character || undefined

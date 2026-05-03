@@ -1,12 +1,13 @@
 import { STORAGE_KEYS } from '@/constants/storage'
 import { resolveChatMode, resolveChatModelId } from '@/constants/chat'
-import type { Character, ChatMode, ChatModelId } from '@/types'
+import type { Character, ChatMode, ChatModelId, RelationshipStateSnapshot } from '@/types'
 import { getJson, removeStorage, setJson } from '@/utils/storage'
 
 export interface HomeCharacterCache {
   characterId: number | null
   conversationId: number | null
   character: Character
+  relationshipState?: RelationshipStateSnapshot | null
   timestamp: number
 }
 

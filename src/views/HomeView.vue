@@ -14,9 +14,9 @@
           <section class="home-identity">
             <h1 class="home-identity__name">{{ homeCharacter.character.name }}</h1>
             <div class="home-identity__affection">
-              <span class="home-identity__affection-label">好感度 {{ affectionValue }}</span>
+              <span class="home-identity__affection-label">{{ relationshipLabel }}</span>
               <div class="home-identity__meter">
-                <span class="home-identity__meter-fill" :style="{ width: `${affectionValue}%` }" />
+                <span class="home-identity__meter-fill" :style="{ width: `${affectionProgress}%` }" />
               </div>
             </div>
           </section>
@@ -134,19 +134,19 @@ const messageAvatarStyle = computed(() => {
   }
 })
 
-const affectionValue = computed(() => {
-  const character = homeCharacter.value?.character
-  if (!character) return 0
+const relationshipState = computed(() => homeCharacter.value?.relationshipState || null)
+const relationshipLabel = computed(() => {
+  const state = relationshipState.value
 
-  if (typeof character.likeCount === 'number' && character.likeCount > 0) {
-    return Math.max(48, Math.min(99, character.likeCount))
+  if (!state) {
+    return '陌生期 · 好感度 0'
   }
 
-  if (typeof character.messageCount === 'number' && character.messageCount > 0) {
-    return Math.max(42, Math.min(96, character.messageCount * 6))
-  }
-
-  return character.isFavorite ? 88 : 76
+  return `${state.intimacyStageLabel} · 好感度 ${state.favorabilityScore}`
+})
+const affectionProgress = computed(() => {
+  const progress = relationshipState.value?.progressToNextStage
+  return typeof progress === 'number' ? Math.max(0, Math.min(100, progress)) : 0
 })
 
 onMounted(async () => {
@@ -200,6 +200,7 @@ function mapPinnedCharacter(serverData: PinnedCharacterSummary): HomeCharacterCa
       companionBackgroundUrl: serverData.companionBackgroundUrl || null,
       sleepBackgroundUrl: serverData.sleepBackgroundUrl || null
     } as Character,
+    relationshipState: serverData.relationshipState || null,
     timestamp: Date.now()
   }
 }

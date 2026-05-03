@@ -59,8 +59,10 @@ export interface Conversation {
   lastMessageAt: string | null
   lastMessagePreview?: string | null
   favorabilityScore?: number | null
+  trustScore?: number | null
   intimacyStage?: string | null
   relationshipPhase?: string | null
+  relationshipState?: RelationshipStateSnapshot | null
   createdAt?: string
   updatedAt?: string
   character?: Character
@@ -99,15 +101,30 @@ export interface ConversationMessagesResponse {
     name: string
     avatarUrl: string
   }
+  relationshipSummary?: string
+  relationshipState?: RelationshipStateSnapshot | null
   messages: Message[]
 }
 
+export interface RelationshipStateSnapshot {
+  favorabilityScore: number
+  trustScore: number
+  intimacyStage: RelationshipStage
+  intimacyStageLabel: string
+  relationshipPhase: string | null
+  recentBondSummary: string | null
+  recentConflictSummary: string | null
+  nextStage: RelationshipStage | null
+  nextStageLabel: string | null
+  nextStageFavorabilityScore: number | null
+  nextStageTrustScore: number | null
+  progressToNextStage: number
+}
+
 export interface SendMessageResponse {
-  userMessage: Message | null
   assistantMessage: Message
-  pointsConsumed: number
-  pointsBalance: number
   isGreeting?: boolean
+  relationshipState?: RelationshipStateSnapshot | null
 }
 
 export interface CreateCharacterRequest {
@@ -154,8 +171,10 @@ export interface PinnedCharacterSummary {
   chatBackgroundUrl?: string | null
   companionBackgroundUrl?: string | null
   sleepBackgroundUrl?: string | null
+  relationshipState?: RelationshipStateSnapshot | null
 }
 
+export type RelationshipStage = 'stranger' | 'familiar' | 'close' | 'ambiguous' | 'romantic'
 export type ChatMode = 'normal' | 'romantic'
 export type ChatModelId = 'roleplay' | 'gpt' | 'deepseek'
 export type BackgroundType = 'chat' | 'sleep' | 'companion'
