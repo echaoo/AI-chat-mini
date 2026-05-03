@@ -12,7 +12,9 @@
     <div v-else class="overlay-header__spacer" aria-hidden="true" />
 
     <div class="overlay-header__summary">
-      <h1 class="overlay-header__title">{{ title }}</h1>
+      <slot>
+        <h1 class="overlay-header__title">{{ title }}</h1>
+      </slot>
     </div>
 
     <div class="overlay-header__right">

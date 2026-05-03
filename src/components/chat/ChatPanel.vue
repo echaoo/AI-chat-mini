@@ -120,6 +120,7 @@ import type {
   ConversationMessagesResponse,
   CreateConversationResponse,
   Message,
+  RelationshipStateSnapshot,
   SendMessageResponse
 } from '@/types'
 import { getHomeCharacterCache, setHomeCharacterCache } from '@/utils/cache'
@@ -140,6 +141,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'conversation-ready', payload: { conversationId: number; character: Character }): void
+  (event: 'relationship-updated', payload: RelationshipStateSnapshot | null): void
 }>()
 
 const uiStore = useUiStore()
@@ -156,6 +158,7 @@ const historyPage = ref(1)
 const hasMoreHistory = ref(false)
 const isLoadingHistory = ref(false)
 const initSeed = ref(0)
+const relationshipState = ref<RelationshipStateSnapshot | null>(null)
 const previewLimit = HISTORY_PAGE_SIZE
 
 const hasToolbar = computed(() => props.showToolbar !== false)
@@ -223,13 +226,18 @@ async function initConversation(nextCharacterId: number, nextConversationId: num
   historyPage.value = 1
   hasMoreHistory.value = false
   messages.value = []
+  updateRelationshipState(null)
+
+  const cachedHome = getHomeCharacterCache()
+  if (cachedHome?.characterId === props.character.id) {
+    updateRelationshipState(cachedHome.relationshipState || null)
+  }
 
   try {
     if (nextConversationId) {
       conversationId.value = nextConversationId
       await loadExistingConversation(currentInit)
     } else {
-      const cachedHome = getHomeCharacterCache()
       const cachedConversationId = cachedHome?.characterId === props.character.id ? cachedHome.conversationId || 0 : 0
 
       if (cachedConversationId) {
@@ -292,6 +300,7 @@ async function loadExistingConversation(currentInit: number) {
     if (currentInit !== initSeed.value) return
 
     updateMessages(response.messages || [])
+    updateRelationshipState(response.relationshipState || null)
     historyPage.value = 1
     hasMoreHistory.value = (response.messages || []).length === HISTORY_PAGE_SIZE
     rememberConversation()
@@ -307,6 +316,9 @@ async function refreshConversationMessages() {
   const response = await conversationApi.getConversationMessages(conversationId.value, 1, HISTORY_PAGE_SIZE)
   const latestMessages = response.messages || []
   updateMessages(latestMessages)
+  if (response.relationshipState) {
+    updateRelationshipState(response.relationshipState)
+  }
   historyPage.value = 1
   hasMoreHistory.value = latestMessages.length === HISTORY_PAGE_SIZE
   return latestMessages
@@ -656,18 +668,25 @@ function rememberConversation() {
 }
 
 function syncRelationshipState(response: RelationshipResponse) {
-  const relationshipState = response.relationshipState || null
+  const nextRelationshipState = response.relationshipState || null
 
-  if (!relationshipState || !props.character) return
+  if (!nextRelationshipState || !props.character) return
+
+  updateRelationshipState(nextRelationshipState)
 
   const homeCache = getHomeCharacterCache()
   if (homeCache?.characterId !== props.character.id) return
 
   setHomeCharacterCache({
     ...homeCache,
-    relationshipState,
+    relationshipState: nextRelationshipState,
     timestamp: Date.now()
   })
+}
+
+function updateRelationshipState(nextRelationshipState: RelationshipStateSnapshot | null) {
+  relationshipState.value = nextRelationshipState
+  emit('relationship-updated', nextRelationshipState)
 }
 
 function triggerMemoryUpdate() {

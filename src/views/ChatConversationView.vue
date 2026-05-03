@@ -1,7 +1,19 @@
 <template>
   <div class="chat-conversation" :style="backgroundStyle">
     <div class="chat-conversation__inner">
-      <OverlayHeader :title="currentCharacter?.name || '聊天'" @back="goBack">
+      <OverlayHeader class="chat-conversation__header" :title="currentCharacter?.name || '聊天'" @back="goBack">
+        <div class="chat-conversation__header-summary">
+          <h1 class="chat-conversation__header-name">{{ currentCharacter?.name || '聊天' }}</h1>
+          <div v-if="relationshipState" class="chat-conversation__relationship">
+            <span class="chat-conversation__relationship-stage">{{ relationshipStage }}</span>
+            <div class="chat-conversation__relationship-progress">
+              <span class="chat-conversation__relationship-track" aria-hidden="true">
+                <span class="chat-conversation__relationship-fill" :style="{ width: `${relationshipProgress}%` }" />
+              </span>
+              <span class="chat-conversation__relationship-value">{{ relationshipScoreText }}</span>
+            </div>
+          </div>
+        </div>
         <template #right>
           <button class="chat-conversation__icon-button" type="button" aria-label="设置" @click="openSettings">
             <img :src="settingIcon" alt="" />
@@ -17,6 +29,7 @@
           :chat-mode="chatSettings.chatMode"
           :show-toolbar="false"
           @conversation-ready="handleConversationReady"
+          @relationship-updated="handleRelationshipUpdated"
         />
       </section>
 
@@ -43,7 +56,7 @@ import OverlayHeader from '@/components/common/OverlayHeader.vue'
 import settingIcon from '@/assets/chat/setting.png'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import { characterApi } from '@/services/api'
-import type { Character } from '@/types'
+import type { Character, RelationshipStateSnapshot } from '@/types'
 import { getChatEntryCharacterCache, getChatSettingsCache, setChatEntryCharacterCache } from '@/utils/cache'
 import { getCharacterCover } from '@/utils/character'
 
@@ -53,6 +66,7 @@ const router = useRouter()
 const currentCharacter = ref<Character | null>(null)
 const panelConversationId = ref<number | null>(null)
 const chatSettings = ref(getChatSettingsCache())
+const relationshipState = ref<RelationshipStateSnapshot | null>(null)
 const loading = ref(true)
 const error = ref('')
 const resolveSeed = ref(0)
@@ -66,6 +80,22 @@ const backgroundStyle = computed(() => {
   return {
     backgroundImage: `linear-gradient(180deg, rgba(10, 10, 10, 0.22), rgba(10, 10, 10, 0.28)), url(${cover})`
   }
+})
+const relationshipStage = computed(() => {
+  const state = relationshipState.value
+  return state ? `${state.intimacyStageLabel} · 信任值 ${state.trustScore}` : ''
+})
+const relationshipProgress = computed(() => {
+  const progress = relationshipState.value?.progressToNextStage ?? 0
+  return Math.max(0, Math.min(100, progress))
+})
+const relationshipScoreText = computed(() => {
+  const state = relationshipState.value
+  if (!state) return ''
+
+  return typeof state.nextStageFavorabilityScore === 'number'
+    ? `${state.favorabilityScore} / ${state.nextStageFavorabilityScore}`
+    : String(state.favorabilityScore)
 })
 
 watch(
@@ -86,6 +116,7 @@ async function resolveChatTarget() {
   loading.value = true
   error.value = ''
   panelConversationId.value = conversationId || null
+  relationshipState.value = null
 
   if (!characterId) {
     currentCharacter.value = null
@@ -150,6 +181,10 @@ function handleConversationReady(payload: { conversationId: number; character: C
   panelConversationId.value = payload.conversationId
   setChatEntryCharacterCache(payload.character)
 }
+
+function handleRelationshipUpdated(nextRelationshipState: RelationshipStateSnapshot | null) {
+  relationshipState.value = nextRelationshipState
+}
 </script>
 
 <style scoped lang="scss">
@@ -169,6 +204,81 @@ function handleConversationReady(payload: { conversationId: number; character: C
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.chat-conversation__header :deep(.overlay-header__summary) {
+  display: flex;
+  align-items: center;
+}
+
+.chat-conversation__header-summary {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(84px, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-conversation__header-name {
+  max-width: 112px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.24);
+}
+
+.chat-conversation__relationship {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.chat-conversation__relationship-stage {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-conversation__relationship-progress {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(32px, 33%) auto;
+  align-items: center;
+  justify-content: start;
+  gap: 6px;
+}
+
+.chat-conversation__relationship-track {
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.chat-conversation__relationship-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f1b7d2 0%, #f3d47a 100%);
+}
+
+.chat-conversation__relationship-value {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .chat-conversation__icon-button {
