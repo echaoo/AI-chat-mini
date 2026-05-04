@@ -1,6 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const routes = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/LoginView.vue'),
+    meta: { title: '邮箱登录' }
+  },
   {
     path: '/',
     name: 'home',
@@ -67,6 +74,23 @@ const router = createRouter({
   scrollBehavior() {
     return { top: 0 }
   }
+})
+
+router.beforeEach((to) => {
+  if (to.name === 'login') return true
+
+  const authStore = useAuthStore()
+
+  if (!authStore.isLoggedIn) {
+    return {
+      name: 'login',
+      query: {
+        redirect: to.fullPath
+      }
+    }
+  }
+
+  return true
 })
 
 router.afterEach((to) => {

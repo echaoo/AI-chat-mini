@@ -9,11 +9,12 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
 
 async function bootstrap() {
   const authStore = useAuthStore(pinia)
   await authStore.bootstrap()
+  app.use(router)
+  await router.isReady()
   app.mount('#app')
 }
 

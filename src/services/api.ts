@@ -2,12 +2,14 @@ import { API_BASE_URL } from '@/constants/env'
 import { del, get, post, request } from '@/services/http'
 import type {
   BackgroundType,
+  AuthLoginResponse,
   Character,
   ChatMode,
   Conversation,
   ConversationMessagesResponse,
   CreateCharacterRequest,
   CreateConversationResponse,
+  EmailLoginRequest,
   Message,
   PinnedCharacterSummary,
   SendMessageResponse,
@@ -65,6 +67,9 @@ function normalizeMessages(messages: Message[] | undefined) {
 }
 
 export const authApi = {
+  emailLogin(data: EmailLoginRequest) {
+    return post<AuthLoginResponse>('/companion/auth/email', data)
+  },
   getMe() {
     return get<UserInfo>('/companion/auth/me')
   }

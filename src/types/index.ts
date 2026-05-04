@@ -148,11 +148,21 @@ export interface UserInfo {
   openId?: string
   name: string | null
   avatarUrl: string | null
+  email?: string | null
   phone?: string | null
   provider?: string
   points: number
   status?: string
   createdAt?: string
+}
+
+export interface EmailLoginRequest {
+  email: string
+}
+
+export interface AuthLoginResponse {
+  token: string
+  user: UserInfo
 }
 
 export interface ApiResponse<T = unknown> {

@@ -9,6 +9,10 @@
           <strong class="me-list__value">{{ displayName }}</strong>
         </div>
         <div class="me-list__item">
+          <span class="me-list__label">邮箱</span>
+          <strong class="me-list__value">{{ emailLabel }}</strong>
+        </div>
+        <div class="me-list__item">
           <span class="me-list__label">积分余额</span>
           <strong class="me-list__value">{{ pointsBalance }}</strong>
         </div>
@@ -29,6 +33,17 @@
             <span class="me-list__value">{{ currentModelLabel }}</span>
             <img class="me-list__arrow" :src="arrowRightIcon" alt="" />
           </span>
+        </button>
+        <button class="me-list__item me-list__item--action" type="button" @click="openEmailLogin">
+          <span class="me-list__label">邮箱登录</span>
+          <span class="me-list__action-meta">
+            <span class="me-list__value">{{ emailActionLabel }}</span>
+            <img class="me-list__arrow" :src="arrowRightIcon" alt="" />
+          </span>
+        </button>
+        <button class="me-list__item me-list__item--action" type="button" @click="logout">
+          <span class="me-list__label">退出登录</span>
+          <span class="me-list__value me-list__value--danger">退出</span>
         </button>
       </section>
     </div>
@@ -52,6 +67,8 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 
 const displayName = computed(() => authStore.userInfo?.name || '体验用户')
+const emailLabel = computed(() => authStore.userInfo?.email || '未登录邮箱')
+const emailActionLabel = computed(() => (authStore.userInfo?.provider === 'email' ? '切换账号' : '登录'))
 const pointsBalance = computed(() => String(authStore.userInfo?.points ?? 0))
 const currentModelLabel = computed(() => getChatModelLabel(getChatSettingsCache().modelId))
 
@@ -61,6 +78,24 @@ function openMyPreferences() {
 
 function openModelSelection() {
   router.push({ name: 'chat-settings' })
+}
+
+function openEmailLogin() {
+  router.push({ name: 'login' })
+}
+
+async function logout() {
+  const confirmed = await uiStore.confirm({
+    title: '退出登录',
+    message: '退出后需要重新登录。',
+    confirmText: '退出',
+    variant: 'danger'
+  })
+
+  if (!confirmed) return
+
+  authStore.logout()
+  router.replace({ name: 'login' })
 }
 
 function goBack() {
@@ -124,7 +159,17 @@ function goBack() {
 
 .me-list__value {
   flex-shrink: 0;
+  min-width: 0;
+  max-width: min(60vw, 420px);
   color: var(--text-secondary);
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-list__value--danger {
+  color: var(--danger);
 }
 
 .me-list__action-meta {
